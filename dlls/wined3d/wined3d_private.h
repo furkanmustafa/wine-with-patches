@@ -177,8 +177,9 @@ static inline enum complex_fixup get_complex_fixup(struct color_fixup_desc fixup
 #define MAX_STREAMS                 16
 #define MAX_TEXTURES                8
 #define MAX_FRAGMENT_SAMPLERS       32
+#define MAX_GEOMETRY_SAMPLERS       16
 #define MAX_VERTEX_SAMPLERS         32
-#define MAX_COMBINED_SAMPLERS       (MAX_FRAGMENT_SAMPLERS + MAX_VERTEX_SAMPLERS)
+#define MAX_COMBINED_SAMPLERS       (MAX_FRAGMENT_SAMPLERS + MAX_GEOMETRY_SAMPLERS + MAX_VERTEX_SAMPLERS)
 #define MAX_ACTIVE_LIGHTS           8
 #define MAX_CLIP_DISTANCES          WINED3DMAXUSERCLIPPLANES
 #define MAX_CONSTANT_BUFFERS        15
@@ -3838,6 +3839,11 @@ static inline BOOL use_vs(const struct wined3d_state *state)
 static inline BOOL use_ps(const struct wined3d_state *state)
 {
     return !!state->shader[WINED3D_SHADER_TYPE_PIXEL];
+}
+
+static inline BOOL use_gs(const struct wined3d_state *state)
+{
+    return !!state->shader[WINED3D_SHADER_TYPE_GEOMETRY];
 }
 
 static inline void context_apply_state(struct wined3d_context *context,
