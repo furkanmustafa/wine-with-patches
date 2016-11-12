@@ -176,8 +176,8 @@ static inline enum complex_fixup get_complex_fixup(struct color_fixup_desc fixup
 #define MAX_STREAM_OUT              4
 #define MAX_STREAMS                 16
 #define MAX_TEXTURES                8
-#define MAX_FRAGMENT_SAMPLERS       16
-#define MAX_VERTEX_SAMPLERS         4
+#define MAX_FRAGMENT_SAMPLERS       32
+#define MAX_VERTEX_SAMPLERS         32
 #define MAX_COMBINED_SAMPLERS       (MAX_FRAGMENT_SAMPLERS + MAX_VERTEX_SAMPLERS)
 #define MAX_ACTIVE_LIGHTS           8
 #define MAX_CLIP_DISTANCES          WINED3DMAXUSERCLIPPLANES
