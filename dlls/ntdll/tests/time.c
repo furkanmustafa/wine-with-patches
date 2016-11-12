@@ -18,7 +18,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define NONAMELESSUNION
 #include "ntdll_test.h"
+#include "ddk/wdm.h"
 
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
@@ -26,6 +28,9 @@
 
 static VOID (WINAPI *pRtlTimeToTimeFields)( const LARGE_INTEGER *liTime, PTIME_FIELDS TimeFields) ;
 static VOID (WINAPI *pRtlTimeFieldsToTime)(  PTIME_FIELDS TimeFields,  PLARGE_INTEGER Time) ;
+static NTSTATUS (WINAPI *pNtDelayExecution)(BOOLEAN alterable, const LARGE_INTEGER *timeout);
+static ULONG (WINAPI *pNtGetTickCount)(void);
+static void (WINAPI *pNtQuerySystemTime)(PLARGE_INTEGER Time);
 
 static const int MonthLengths[2][12] =
 {
@@ -94,6 +99,36 @@ static void test_pRtlTimeToTimeFields(void)
     }
 }
 
+static void test_TickCount(void)
+{
+    /* This is a well-known address relied upon by programs. */
+    PKSHARED_USER_DATA user_shared_data = (void *)0x7ffe0000;
+    LARGE_INTEGER now;
+    LONG diff;
+
+    Sleep(250);
+
+    /* Ideally, this would be continuously updated. */
+    diff = user_shared_data->u.TickCountQuad;
+    diff = NtGetTickCount() - diff;
+    todo_wine ok( diff < 16,
+        "NtGetTickCount - TickCountQuad too high, expected: < 16  got: %d\n", diff);
+
+    /* We try to do good enough and have NtQuerySystemTime reinitialize user_shared_data. */
+    NtQuerySystemTime( &now );
+    diff = user_shared_data->u.TickCountQuad;
+    diff = NtGetTickCount() - diff;
+    ok( diff < 16,
+        "NtGetTickCount - TickCountQuad too high, expected: < 16  got: %d\n", diff);
+
+    NtQuerySystemTime( &now );
+    diff = (user_shared_data->TickCountLowDeprecated * (LONGLONG)user_shared_data->TickCountMultiplier) >> 24;
+    diff = NtGetTickCount() - diff;
+    ok( diff < 16,
+        "NtGetTickCount - TickCountLow*TickCountMultiplier too high, expected: < 16  got: %d\n",
+        diff);
+}
+
 START_TEST(time)
 {
     HMODULE mod = GetModuleHandleA("ntdll.dll");
@@ -103,4 +138,9 @@ START_TEST(time)
         test_pRtlTimeToTimeFields();
     else
         win_skip("Required time conversion functions are not available\n");
+
+    pNtDelayExecution = (void *)GetProcAddress(mod,"NtDelayExecution");
+    pNtGetTickCount = (void *)GetProcAddress(mod,"NtGetTickCount");
+    pNtQuerySystemTime = (void *)GetProcAddress(mod,"NtQuerySystemTime");
+    test_TickCount();
 }
