@@ -453,6 +453,23 @@ static void start_thread( struct startup_info *info )
     call_thread_entry_point( (LPTHREAD_START_ROUTINE)func, arg );
 }
 
+NTSTATUS WINAPI NtCreateThreadEx(PHANDLE hThread,
+    ACCESS_MASK DesiredAccess,
+    POBJECT_ATTRIBUTES ObjectAttributes,
+    HANDLE ProcessHandle,
+    LPTHREAD_START_ROUTINE lpStartAddress,
+    LPVOID lpParameter,
+    ULONG CreateFlags,
+    ULONG StackZeroBits,
+    ULONG SizeOfStackCommit,
+    ULONG SizeOfStackReserve,
+    LPVOID lpBytesBuffer)
+{
+    TRACE( "%p, %lx, %p, %lx, %p, %p, %lx, %lx, %lx, %lx, %p\n", hThread, DesiredAccess, ObjectAttributes, ProcessHandle, lpStartAddress, lpParameter, CreateFlags, StackZeroBits, SizeOfStackCommit, SizeOfStackReserve, lpBytesBuffer );
+    NTSTATUS status = RtlCreateUserThread(ProcessHandle, NULL, CreateFlags & 1, NULL, 0, 0, lpStartAddress, lpParameter, hThread, NULL);
+    TRACE( "ret=%d, handle=%lx\n", status, *hThread );
+    return status;
+}
 
 /***********************************************************************
  *              RtlCreateUserThread   (NTDLL.@)
