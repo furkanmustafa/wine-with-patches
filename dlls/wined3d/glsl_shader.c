@@ -2316,6 +2316,12 @@ static void shader_generate_glsl_declarations(const struct wined3d_context *cont
                 }
             }
             shader_addline(buffer, "vec4 %s_in[%u];\n", prefix, in_count);
+
+            if (ps_args->dual_source_blend)
+            {
+                shader_addline(buffer, "varying out vec4 dualFragData0;\n");
+                shader_addline(buffer, "varying out vec4 dualFragData1;\n");
+            }
         }
 
         for (i = 0, map = reg_maps->bumpmat; map; map >>= 1, ++i)
@@ -2520,6 +2526,7 @@ static void shader_glsl_get_register_name(const struct wined3d_shader_register *
     const struct wined3d_shader_version *version = &reg_maps->shader_version;
     const struct wined3d_gl_info *gl_info = ins->ctx->gl_info;
     const char *prefix = shader_glsl_get_prefix(version->type);
+    struct shader_glsl_ctx_priv *priv = ins->ctx->backend_data;
     struct glsl_src_param rel_param0, rel_param1;
     char imm_str[4][17];
 
@@ -2538,8 +2545,6 @@ static void shader_glsl_get_register_name(const struct wined3d_shader_register *
         case WINED3DSPR_INPUT:
             if (version->type == WINED3D_SHADER_TYPE_VERTEX)
             {
-                struct shader_glsl_ctx_priv *priv = ins->ctx->backend_data;
-
                 if (reg->idx[0].rel_addr)
                     FIXME("VS3+ input registers relative addressing.\n");
                 if (priv->cur_vs_args->swizzle_map & (1u << reg->idx[0].offset))
@@ -2684,7 +2689,10 @@ static void shader_glsl_get_register_name(const struct wined3d_shader_register *
                 WARN("Write to render target %u, only %d supported.\n",
                         reg->idx[0].offset, gl_info->limits.buffers);
 
-            sprintf(register_name, "%s[%u]", get_fragment_output(gl_info), reg->idx[0].offset);
+            if (version->type == WINED3D_SHADER_TYPE_PIXEL && priv->cur_ps_args->dual_source_blend)
+                sprintf(register_name, "dualFragData%u", reg->idx[0].offset);
+            else
+                sprintf(register_name, "%s[%u]", get_fragment_output(gl_info), reg->idx[0].offset);
             break;
 
         case WINED3DSPR_RASTOUT:
@@ -8239,6 +8247,14 @@ static void set_glsl_shader_program(const struct wined3d_context *context, const
         TRACE("Attaching GLSL shader object %u to program %u.\n", ps_id, program_id);
         GL_EXTCALL(glAttachShader(program_id, ps_id));
         checkGLcall("glAttachShader");
+
+        if (state_is_dual_source_blend(state))
+        {
+            GL_EXTCALL(glBindFragDataLocationIndexed(program_id, 0, 0, "dualFragData0"));
+            checkGLcall("glBindFragDataLocationIndexed");
+            GL_EXTCALL(glBindFragDataLocationIndexed(program_id, 0, 1, "dualFragData1"));
+            checkGLcall("glBindFragDataLocationIndexed");
+        }
 
         list_add_head(ps_list, &entry->ps.shader_entry);
     }

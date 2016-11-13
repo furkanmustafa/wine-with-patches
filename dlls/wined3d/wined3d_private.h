@@ -1169,7 +1169,8 @@ struct ps_compile_args {
     DWORD flatshading : 1;
     DWORD alpha_test_func : 3;
     DWORD render_offscreen : 1;
-    DWORD padding : 26;
+    DWORD dual_source_blend : 1;
+    DWORD padding : 25;
 };
 
 enum fog_src_type {
@@ -3468,6 +3469,20 @@ void state_pointsprite(struct wined3d_context *context,
         const struct wined3d_state *state, DWORD state_id) DECLSPEC_HIDDEN;
 void state_shademode(struct wined3d_context *context,
         const struct wined3d_state *state, DWORD state_id) DECLSPEC_HIDDEN;
+static inline BOOL state_is_dual_source_blend(const struct wined3d_state *state)
+{
+#define IS_DUAL_SOURCE_BLEND(x) ((x) >= WINED3D_BLEND_SRC1_COLOR && (x) <= WINED3D_BLEND_INV_SRC1_ALPHA)
+    if (state->render_states[WINED3D_RS_ALPHABLENDENABLE] &&
+            (IS_DUAL_SOURCE_BLEND(state->render_states[WINED3D_RS_SRCBLENDALPHA]) ||
+             IS_DUAL_SOURCE_BLEND(state->render_states[WINED3D_RS_DESTBLENDALPHA])))
+    {
+        return TRUE;
+    }
+
+    return IS_DUAL_SOURCE_BLEND(state->render_states[WINED3D_RS_SRCBLEND]) ||
+            IS_DUAL_SOURCE_BLEND(state->render_states[WINED3D_RS_DESTBLEND]);
+#undef IS_DUAL_SOURCE_BLEND
+}
 
 GLenum gl_primitive_type_from_d3d(enum wined3d_primitive_type primitive_type) DECLSPEC_HIDDEN;
 
