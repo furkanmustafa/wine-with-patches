@@ -3132,6 +3132,7 @@ static void load_gl_funcs(struct wined3d_gl_info *gl_info)
     USE_GL_FUNC(glEnablei)                  /* OpenGL 3.0 */
     USE_GL_FUNC(glEnableVertexAttribArray)  /* OpenGL 2.0 */
     USE_GL_FUNC(glEndQuery)                 /* OpenGL 1.5 */
+    USE_GL_FUNC(glFramebufferTexture)
     USE_GL_FUNC(glGenBuffers)               /* OpenGL 1.5 */
     USE_GL_FUNC(glGenQueries)               /* OpenGL 1.5 */
     USE_GL_FUNC(glGenVertexArrays)          /* OpenGL 3.0 */

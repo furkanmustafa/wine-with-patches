@@ -3295,8 +3295,14 @@ static inline struct wined3d_surface *wined3d_rendertarget_view_get_surface(
 {
     struct wined3d_texture *texture;
 
-    if (!view || view->resource->type != WINED3D_RTYPE_TEXTURE_2D)
+    if (!view || (view->resource->type != WINED3D_RTYPE_TEXTURE_2D &&
+            view->resource->type != WINED3D_RTYPE_TEXTURE_3D &&
+            view->resource->type != WINED3D_RTYPE_TEXTURE_1D))
+    {
+        if (view)
+            DPRINTF("wined3d_rendertarget_view_get_surface: view->resource->type %d != WINED3D_RTYPE_TEXTURE_2D\n", view->resource->type);
         return NULL;
+    }
 
     texture = texture_from_resource(view->resource);
 

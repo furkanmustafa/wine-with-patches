@@ -146,6 +146,12 @@ static void context_attach_gl_texture_fbo(struct wined3d_context *context,
                 resource->target, resource->object, resource->level);
         checkGLcall("glFramebufferTexture1D()");
     }
+    else if (resource->target == GL_TEXTURE_3D)
+    {
+        GL_EXTCALL(glFramebufferTexture(fbo_target, attachment,
+                resource->object, resource->level));
+        checkGLcall("glFramebufferTexture3D()");
+    }
     else
     {
         gl_info->fbo_ops.glFramebufferTexture2D(fbo_target, attachment,
