@@ -1248,6 +1248,7 @@ static void wined3d_buffer_unmap(struct wined3d_buffer *buffer)
         context_release(context);
 
         buffer_clear_dirty_areas(buffer);
+        buffer->flags &= ~WINED3D_BUFFER_DISCARD;
         buffer->map_ptr = NULL;
     }
     else if (buffer->flags & WINED3D_BUFFER_HASDESC)
