@@ -293,6 +293,9 @@ struct glsl_ffp_destroy_ctx
 
 static void shader_glsl_generate_shader_epilogue(const struct wined3d_shader_context *ctx);
 
+static void shader_glsl_prologue_ps(const struct wined3d_shader_context *ctx);
+static void shader_glsl_prologue_vs(const struct wined3d_shader_context *ctx);
+
 static const char *debug_gl_shader_type(GLenum type)
 {
     switch (type)
@@ -4577,11 +4580,22 @@ static void shader_glsl_ret(const struct wined3d_shader_instruction *ins)
 {
     const struct wined3d_shader_version *version = &ins->ctx->shader->reg_maps.shader_version;
 
-    if (version->major >= 4 && !ins->ctx->state->in_subroutine)
+    switch(version->type)
     {
-        shader_glsl_generate_shader_epilogue(ins->ctx);
-        shader_addline(ins->ctx->buffer, "return;\n");
+    case WINED3D_SHADER_TYPE_PIXEL:
+        shader_glsl_prologue_ps(ins->ctx);
+        break;
+    case WINED3D_SHADER_TYPE_VERTEX:
+        shader_glsl_prologue_vs(ins->ctx);
+        break;
+    default:
+        if (version->major >= 4 && !ins->ctx->state->in_subroutine) {
+            shader_glsl_generate_shader_epilogue(ins->ctx);
+        }
+        break;
     }
+
+    shader_addline(ins->ctx->buffer, "return;\n");
 }
 
 /*********************************************
@@ -6236,6 +6250,84 @@ static GLuint shader_glsl_generate_pshader(const struct wined3d_context *context
     return shader_id;
 }
 
+static void shader_glsl_prologue_ps(const struct wined3d_shader_context *ctx)
+{
+    const struct wined3d_shader *shader = ctx->shader;
+    const struct wined3d_shader_reg_maps *reg_maps = &shader->reg_maps;
+    const struct wined3d_gl_info *gl_info = ctx->gl_info;
+    const struct shader_glsl_ctx_priv *priv = ctx->backend_data;
+    const struct ps_compile_args *args = priv->cur_ps_args;
+
+    /* Pixel shaders < 2.0 place the resulting color in R0 implicitly */
+    if (reg_maps->shader_version.major < 2)
+        shader_addline(buffer, "%s[0] = R0;\n", get_fragment_output(gl_info));
+        shader_addline(ctx->buffer, "%s[0] = R0;\n", get_fragment_output(gl_info));
+
+    if (args->srgb_correction)
+        shader_glsl_generate_srgb_write_correction(buffer, gl_info);
+        shader_glsl_generate_srgb_write_correction(ctx->buffer, gl_info);
+
+    /* SM < 3 does not replace the fog stage. */
+    if (reg_maps->shader_version.major < 3)
+        shader_glsl_generate_fog_code(buffer, gl_info, args->fog);
+
+    shader_glsl_generate_alpha_test(buffer, gl_info, args->alpha_test_func + 1);
+
+    shader_addline(buffer, "}\n");
+
+    TRACE("Compiling shader object %u.\n", shader_id);
+    shader_glsl_compile(gl_info, shader_id, buffer->buffer);
+        shader_glsl_generate_fog_code(ctx->buffer, gl_info, args->fog);
+
+    return shader_id;
+    shader_glsl_generate_alpha_test(ctx->buffer, gl_info, args->alpha_test_func + 1);
+}
+
+static void shader_glsl_prologue_vs(const struct wined3d_shader_context *ctx)
+{
+    const struct wined3d_shader *shader = ctx->shader;
+    const struct wined3d_shader_reg_maps *reg_maps = &shader->reg_maps;
+    const struct wined3d_gl_info *gl_info = ctx->gl_info;
+    const struct shader_glsl_ctx_priv *priv = ctx->backend_data;
+    const struct vs_compile_args *args = priv->cur_vs_args;
+    BOOL legacy_context = gl_info->supported[WINED3D_GL_LEGACY_CONTEXT];
+    unsigned int i;
+
+    /* Unpack outputs */
+    shader_addline(ctx->buffer, "setup_vs_output(vs_out);\n");
+
+   /* The D3DRS_FOGTABLEMODE render state defines if the shader-generated fog coord is used
+    * or if the fragment depth is used. If the fragment depth is used(FOGTABLEMODE != NONE),
+    * the fog frag coord is thrown away. If the fog frag coord is used, but not written by
+    * the shader, it is set to 0.0(fully fogged, since start = 1.0, end = 0.0).
+    */
+    if (reg_maps->shader_version.major < 3)
+    {
+        if (args->fog_src == VS_FOG_Z)
+            shader_addline(ctx->buffer, "%s = gl_Position.z;\n",
+                    legacy_context ? "gl_FogFragCoord" : "ffp_varying_fogcoord");
+        else if (!reg_maps->fog)
+            shader_addline(ctx->buffer, "%s = 0.0;\n",
+                    legacy_context ? "gl_FogFragCoord" : "ffp_varying_fogcoord");
+    }
+
+   /* We always store the clipplanes without y inversion. */
+    if (args->clip_enabled)
+    {
+        if (legacy_context)
+            shader_addline(ctx->buffer, "gl_ClipVertex = gl_Position;\n");
+        else
+            for (i = 0; i < gl_info->limits.user_clip_distances; ++i)
+                shader_addline(ctx->buffer, "gl_ClipDistance[%u] = dot(gl_Position, clip_planes[%u]);\n", i, i);
+    }
+
+    if (args->point_size && !args->per_vertex_point_size)
+        shader_addline(ctx->buffer, "gl_PointSize = clamp(ffp_point.size, ffp_point.size_min, ffp_point.size_max);\n");
+
+    if (args->next_shader_type == WINED3D_SHADER_TYPE_PIXEL && !gl_info->supported[ARB_CLIP_CONTROL])
+        shader_glsl_fixup_position(ctx->buffer);
+}
+ 
 static void shader_glsl_generate_vs_epilogue(const struct wined3d_gl_info *gl_info,
         struct wined3d_string_buffer *buffer, const struct wined3d_shader *shader,
         const struct vs_compile_args *args)
