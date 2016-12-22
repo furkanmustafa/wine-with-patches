@@ -59,7 +59,7 @@ static const struct
 resource_type_info[] =
 {
     {0, 0, ""},        /* WINED3D_SHADER_RESOURCE_NONE */
-    {1, 1, ""},        /* WINED3D_SHADER_RESOURCE_BUFFER */
+    {1, 1, "Buffer"},  /* WINED3D_SHADER_RESOURCE_BUFFER */
     {1, 1, "1D"},      /* WINED3D_SHADER_RESOURCE_TEXTURE_1D */
     {2, 2, "2D"},      /* WINED3D_SHADER_RESOURCE_TEXTURE_2D */
     {2, 2, ""},        /* WINED3D_SHADER_RESOURCE_TEXTURE_2DMS */
@@ -68,7 +68,7 @@ resource_type_info[] =
     {2, 2, ""},        /* WINED3D_SHADER_RESOURCE_TEXTURE_1DARRAY */
     {3, 3, "2DArray"}, /* WINED3D_SHADER_RESOURCE_TEXTURE_2DARRAY */
     {3, 3, ""},        /* WINED3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY */
-    {4, ""},           /* WINED3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY */
+    {4, 4, ""},        /* WINED3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY */
 };
 
 struct glsl_dst_param
@@ -2045,6 +2045,12 @@ static void shader_generate_glsl_declarations(const struct wined3d_context *cont
         shadow_sampler = glsl_is_shadow_sampler(shader, ps_args, entry->resource_idx, entry->sampler_idx);
         switch (reg_maps->resource_info[entry->resource_idx].type)
         {
+            case WINED3D_SHADER_RESOURCE_BUFFER:
+                if (shadow_sampler)
+                    FIXME("Unsupported Buffer shadow sampler.\n");
+                sampler_type = "samplerBuffer";
+                break;
+
             case WINED3D_SHADER_RESOURCE_TEXTURE_1D:
                 if (shadow_sampler)
                     sampler_type = "sampler1DShadow";
@@ -3106,7 +3112,10 @@ static void shader_glsl_get_sample_function(const struct wined3d_shader_context 
             ERR("Unexpected flags %#x for texelFetch.\n", flags & ~texel_fetch_flags);
 
         base = "texelFetch";
-        type_part = "";
+        if (resource_type == WINED3D_SHADER_RESOURCE_BUFFER)
+            type_part = "Buffer";
+        else
+            type_part = "";
     }
 
     sample_function->name = string_buffer_get(priv->string_buffers);
