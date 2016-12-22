@@ -92,7 +92,7 @@ static enum wined3d_event_query_result wined3d_event_query_test(const struct win
 
     if (gl_info->supported[ARB_SYNC])
     {
-        GLenum gl_ret = GL_EXTCALL(glClientWaitSync(query->object.sync, 0, 0));
+        GLenum gl_ret = GL_EXTCALL(glClientWaitSync(query->object.sync, GL_SYNC_FLUSH_COMMANDS_BIT, 0));
         checkGLcall("glClientWaitSync");
 
         switch (gl_ret)
