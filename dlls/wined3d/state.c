@@ -4617,26 +4617,6 @@ static void viewport_miscpart(struct wined3d_context *context, const struct wine
     struct wined3d_viewport vp = state->viewport;
     unsigned int width, height;
 
-    if (target)
-    {
-        if (vp.width > target->width)
-            vp.width = target->width;
-        if (vp.height > target->height)
-            vp.height = target->height;
-
-        wined3d_rendertarget_view_get_drawable_size(target, context, &width, &height);
-    }
-    else if (depth_stencil)
-    {
-        width = depth_stencil->width;
-        height = depth_stencil->height;
-    }
-    else
-    {
-        FIXME("No attachments draw calls not supported.\n");
-        return;
-    }
-
     gl_info->gl_ops.gl.p_glDepthRange(vp.min_z, vp.max_z);
     checkGLcall("glDepthRange");
     /* Note: GL requires lower left, DirectX supplies upper left. This is
@@ -4644,7 +4624,29 @@ static void viewport_miscpart(struct wined3d_context *context, const struct wine
     if (context->render_offscreen)
         gl_info->gl_ops.gl.p_glViewport(vp.x, vp.y, vp.width, vp.height);
     else
+    {
+        if (target)
+        {
+            if (vp.width > target->width)
+                vp.width = target->width;
+            if (vp.height > target->height)
+                vp.height = target->height;
+
+            wined3d_rendertarget_view_get_drawable_size(target, context, &width, &height);
+        }
+        else if (depth_stencil)
+        {
+            width = depth_stencil->width;
+            height = depth_stencil->height;
+        }
+        else
+        {
+            FIXME("No attachments draw calls not supported.\n");
+            return;
+        }
+
         gl_info->gl_ops.gl.p_glViewport(vp.x, (height - (vp.y + vp.height)), vp.width, vp.height);
+    }
     checkGLcall("glViewport");
 }
 
