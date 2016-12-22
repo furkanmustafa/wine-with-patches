@@ -1692,6 +1692,7 @@ static void save_context( CONTEXT *context, const ucontext_t *sigcontext )
         context->u.FltSave = *FPU_sig(sigcontext);
         context->MxCsr = context->u.FltSave.MxCsr;
     }
+    context->Dr7 = 0;
 }
 
 
