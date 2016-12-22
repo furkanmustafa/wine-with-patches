@@ -253,6 +253,7 @@ static void STDMETHODCALLTYPE d3d11_immediate_context_Draw(ID3D11DeviceContext *
             iface, vertex_count, start_vertex_location);
 
     wined3d_mutex_lock();
+    wined3d_device_set_base_vertex_index(device->wined3d_device, 0);
     wined3d_device_draw_primitive(device->wined3d_device, start_vertex_location, vertex_count);
     wined3d_mutex_unlock();
 }
@@ -396,6 +397,7 @@ static void STDMETHODCALLTYPE d3d11_immediate_context_DrawInstanced(ID3D11Device
             start_instance_location);
 
     wined3d_mutex_lock();
+    wined3d_device_set_base_vertex_index(device->wined3d_device, 0);
     wined3d_device_draw_primitive_instanced(device->wined3d_device, start_vertex_location,
             instance_vertex_count, start_instance_location, instance_count);
     wined3d_mutex_unlock();
@@ -3210,6 +3212,7 @@ static void STDMETHODCALLTYPE d3d10_device_Draw(ID3D10Device1 *iface, UINT verte
             iface, vertex_count, start_vertex_location);
 
     wined3d_mutex_lock();
+    wined3d_device_set_base_vertex_index(device->wined3d_device, 0);
     wined3d_device_draw_primitive(device->wined3d_device, start_vertex_location, vertex_count);
     wined3d_mutex_unlock();
 }
@@ -3313,6 +3316,7 @@ static void STDMETHODCALLTYPE d3d10_device_DrawInstanced(ID3D10Device1 *iface,
             start_vertex_location, start_instance_location);
 
     wined3d_mutex_lock();
+    wined3d_device_set_base_vertex_index(device->wined3d_device, 0);
     wined3d_device_draw_primitive_instanced(device->wined3d_device, start_vertex_location,
             instance_vertex_count, start_instance_location, instance_count);
     wined3d_mutex_unlock();
