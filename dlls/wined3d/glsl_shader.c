@@ -68,6 +68,7 @@ resource_type_info[] =
     {2, 2, ""},        /* WINED3D_SHADER_RESOURCE_TEXTURE_1DARRAY */
     {3, 3, "2DArray"}, /* WINED3D_SHADER_RESOURCE_TEXTURE_2DARRAY */
     {3, 3, ""},        /* WINED3D_SHADER_RESOURCE_TEXTURE_2DMSARRAY */
+    {4, ""},           /* WINED3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY */
 };
 
 struct glsl_dst_param
@@ -2088,6 +2089,12 @@ static void shader_generate_glsl_declarations(const struct wined3d_context *cont
                     sampler_type = "sampler2DArrayShadow";
                 else
                     sampler_type = "sampler2DArray";
+                break;
+
+            case WINED3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY:
+                if (shadow_sampler)
+                    FIXME("Unsupported Cube array shadow sampler.\n");
+                sampler_type = "samplerCubeArray";
                 break;
 
             default:
@@ -6131,6 +6138,8 @@ static void shader_glsl_enable_extensions(struct wined3d_string_buffer *buffer,
         shader_addline(buffer, "#extension GL_EXT_gpu_shader4 : enable\n");
     if (gl_info->supported[EXT_TEXTURE_ARRAY])
         shader_addline(buffer, "#extension GL_EXT_texture_array : enable\n");
+    if (gl_info->supported[ARB_TEXTURE_CUBE_MAP_ARRAY])
+        shader_addline(buffer, "#extension GL_ARB_texture_cube_map_array : enable\n");
 }
 
 static void shader_glsl_generate_ps_epilogue(const struct wined3d_gl_info *gl_info,

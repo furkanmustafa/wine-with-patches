@@ -1655,6 +1655,10 @@ static void shader_dump_decl_usage(struct wined3d_string_buffer *buffer,
                 shader_addline(buffer, "texture2dmsarray");
                 break;
 
+            case WINED3D_SHADER_RESOURCE_TEXTURE_CUBEARRAY:
+                shader_addline(buffer, "texturecubearray");
+                break;
+
             default:
                 shader_addline(buffer, "unknown");
                 break;
