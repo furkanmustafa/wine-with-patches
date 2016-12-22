@@ -489,7 +489,7 @@ void wined3d_cs_emit_draw(struct wined3d_cs *cs, int base_vertex_idx, unsigned i
 
     op = cs->ops->require_space(cs, sizeof(*op));
     op->opcode = WINED3D_CS_OP_DRAW;
-    op->base_vertex_idx = base_vertex_idx;
+    op->base_vertex_idx = indexed ? base_vertex_idx : 0;
     op->start_idx = start_idx;
     op->index_count = index_count;
     op->start_instance = start_instance;

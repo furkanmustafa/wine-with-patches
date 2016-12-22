@@ -142,6 +142,7 @@ struct glsl_vs_program
     GLint uniform_i_locations[WINED3D_MAX_CONSTS_I];
     GLint uniform_b_locations[WINED3D_MAX_CONSTS_B];
     GLint pos_fixup_location;
+    GLint base_vertex_location;
 
     GLint modelview_matrix_location[MAX_VERTEX_BLENDS];
     GLint projection_matrix_location;
@@ -1471,6 +1472,12 @@ static void shader_glsl_load_constants(void *shader_priv, struct wined3d_context
         checkGLcall("glUniform4fv");
     }
 
+    if (update_mask & WINED3D_SHADER_CONST_BASE_VERTEX)
+    {
+        GL_EXTCALL(glUniform1i(prog->vs.base_vertex_location, state->base_vertex_index));
+        checkGLcall("glUniform1i");
+    }
+
     if (update_mask & WINED3D_SHADER_CONST_FFP_MODELVIEW)
     {
         struct wined3d_matrix mat;
@@ -1840,7 +1847,8 @@ static void shader_glsl_declare_generic_vertex_attribute(struct wined3d_string_b
 
     if (e->sysval_semantic == WINED3D_SV_VERTEX_ID)
     {
-        shader_addline(buffer, "vec4 vs_in%u = vec4(intBitsToFloat(gl_VertexID), 0.0, 0.0, 0.0);\n",
+        shader_addline(buffer, "uniform int base_vertex;\n");
+        shader_addline(buffer, "vec4 vs_in%u = vec4(intBitsToFloat(gl_VertexID - base_vertex), 0.0, 0.0, 0.0);\n",
                 index);
         return;
     }
@@ -7781,6 +7789,7 @@ static void shader_glsl_init_vs_uniform_locations(const struct wined3d_gl_info *
     }
 
     vs->pos_fixup_location = GL_EXTCALL(glGetUniformLocation(program_id, "pos_fixup"));
+    vs->base_vertex_location = GL_EXTCALL(glGetUniformLocation(program_id, "base_vertex"));
 
     for (i = 0; i < MAX_VERTEX_BLENDS; ++i)
     {
@@ -8201,6 +8210,8 @@ static void set_glsl_shader_program(const struct wined3d_context *context, const
             entry->constant_update_mask |= WINED3D_SHADER_CONST_VS_B;
         if (entry->vs.pos_fixup_location != -1)
             entry->constant_update_mask |= WINED3D_SHADER_CONST_POS_FIXUP;
+        if (entry->vs.base_vertex_location != -1)
+            entry->constant_update_mask |= WINED3D_SHADER_CONST_BASE_VERTEX;
 
         shader_glsl_init_uniform_block_bindings(gl_info, priv, program_id, &vshader->reg_maps);
         shader_glsl_load_icb(gl_info, priv, program_id, &vshader->reg_maps);

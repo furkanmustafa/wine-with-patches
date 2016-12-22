@@ -1990,7 +1990,11 @@ void CDECL wined3d_device_set_base_vertex_index(struct wined3d_device *device, I
 {
     TRACE("device %p, base_index %d.\n", device, base_index);
 
-    device->update_state->base_vertex_index = base_index;
+    if (device->update_state->base_vertex_index != base_index)
+    {
+        device->update_state->base_vertex_index = base_index;
+        device_invalidate_state(device, STATE_BASEVERTEXINDEX);
+    }
 }
 
 INT CDECL wined3d_device_get_base_vertex_index(const struct wined3d_device *device)
