@@ -233,6 +233,7 @@ static const struct wined3d_extension_map gl_extension_map[] =
     {"GL_NV_half_float",                    NV_HALF_FLOAT                 },
     {"GL_NV_light_max_exponent",            NV_LIGHT_MAX_EXPONENT         },
     {"GL_NV_point_sprite",                  NV_POINT_SPRITE               },
+    {"GL_NV_primitive_restart",             NV_PRIMITIVE_RESTART          },
     {"GL_NV_register_combiners",            NV_REGISTER_COMBINERS         },
     {"GL_NV_register_combiners2",           NV_REGISTER_COMBINERS2        },
     {"GL_NV_texgen_reflection",             NV_TEXGEN_REFLECTION          },
@@ -3135,6 +3136,7 @@ static void load_gl_funcs(struct wined3d_gl_info *gl_info)
     USE_GL_FUNC(glMapBuffer)                /* OpenGL 1.5 */
     USE_GL_FUNC(glPointParameteri)          /* OpenGL 1.4 */
     USE_GL_FUNC(glPointParameteriv)         /* OpenGL 1.4 */
+    USE_GL_FUNC(glPrimitiveRestartIndex)
     USE_GL_FUNC(glShaderSource)             /* OpenGL 2.0 */
     USE_GL_FUNC(glStencilFuncSeparate)      /* OpenGL 2.0 */
     USE_GL_FUNC(glStencilOpSeparate)        /* OpenGL 2.0 */

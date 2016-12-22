@@ -8851,6 +8851,20 @@ static void shader_glsl_init_context_state(struct wined3d_context *context)
 
     gl_info->gl_ops.gl.p_glEnable(GL_PROGRAM_POINT_SIZE);
     checkGLcall("GL_PROGRAM_POINT_SIZE");
+    if (gl_info->supported[ARB_ES3_COMPATIBILITY])
+    {
+        /* We prefer this method because it correctly handles 16-bit and 32-bit indices. */
+        gl_info->gl_ops.gl.p_glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
+        checkGLcall("GL_PRIMITIVE_RESTART_FIXED_INDEX");
+    }
+    else if (gl_info->supported[NV_PRIMITIVE_RESTART] && GL_EXTCALL(glPrimitiveRestartIndex))
+    {
+        /* FIXME: Does this handle 16-bit indices correctly? */
+        GL_EXTCALL(glPrimitiveRestartIndex(0xFFFFFFFF));
+        checkGLcall("glPrimitiveRestartIndex");
+        gl_info->gl_ops.gl.p_glEnable(GL_PRIMITIVE_RESTART);
+        checkGLcall("GL_PRIMITIVE_RESTART");
+    }
 }
 
 static void shader_glsl_get_caps(const struct wined3d_gl_info *gl_info, struct shader_caps *caps)
