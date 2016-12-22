@@ -2444,6 +2444,10 @@ void context_bind_texture(struct wined3d_context *context, GLenum target, GLuint
                 gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_3D, device->dummy_textures.tex_3d);
                 checkGLcall("glBindTexture");
                 break;
+            case GL_TEXTURE_BUFFER:
+                gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_BUFFER, 0);
+                checkGLcall("glBindTexture");
+                break;
             default:
                 ERR("Unexpected texture target %#x.\n", old_texture_type);
         }

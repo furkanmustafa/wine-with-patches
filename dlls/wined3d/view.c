@@ -393,6 +393,29 @@ void * CDECL wined3d_shader_resource_view_get_parent(const struct wined3d_shader
     return view->parent;
 }
 
+static void wined3d_shader_resource_view_create_buffer_view(struct wined3d_shader_resource_view *view,
+        const struct wined3d_shader_resource_view_desc *desc, struct wined3d_buffer *buffer,
+        const struct wined3d_format *view_format)
+{
+    const struct wined3d_gl_info *gl_info;
+    struct wined3d_context *context;
+
+    context = context_acquire(buffer->resource.device, NULL);
+    gl_info = context->gl_info;
+
+    wined3d_buffer_load_location(buffer, context, WINED3D_LOCATION_BUFFER);
+
+    gl_info->gl_ops.gl.p_glGenTextures(1, &view->object);
+    gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_BUFFER, view->object);
+
+    GL_EXTCALL(glTexBufferRange(GL_TEXTURE_BUFFER, view_format->glInternal, buffer->buffer_object,
+            desc->u.buffer.start_idx * view_format->byte_count, desc->u.buffer.count * view_format->byte_count));
+    checkGLcall("Create buffer view");
+
+    gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_BUFFER, 0);
+    context_release(context);
+}
+
 static HRESULT wined3d_shader_resource_view_init(struct wined3d_shader_resource_view *view,
         const struct wined3d_view_desc *desc, struct wined3d_resource *resource,
         void *parent, const struct wined3d_parent_ops *parent_ops)
@@ -415,7 +438,10 @@ static HRESULT wined3d_shader_resource_view_init(struct wined3d_shader_resource_
 
     if (resource->type == WINED3D_RTYPE_BUFFER)
     {
-        FIXME("Buffer shader resource views not supported.\n");
+        struct wined3d_buffer *buffer = buffer_from_resource(resource);
+
+        view->target = GL_TEXTURE_BUFFER;
+        wined3d_shader_resource_view_create_buffer_view(view, desc, buffer, view_format);
     }
     else
     {

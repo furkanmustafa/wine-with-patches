@@ -155,6 +155,7 @@ static const struct wined3d_extension_map gl_extension_map[] =
     {"GL_ARB_stencil_texturing",            ARB_STENCIL_TEXTURING         },
     {"GL_ARB_sync",                         ARB_SYNC                      },
     {"GL_ARB_texture_border_clamp",         ARB_TEXTURE_BORDER_CLAMP      },
+    {"GL_ARB_texture_buffer_range",         ARB_TEXTURE_BUFFER_RANGE      },
     {"GL_ARB_texture_compression",          ARB_TEXTURE_COMPRESSION       },
     {"GL_ARB_texture_compression_bptc",     ARB_TEXTURE_COMPRESSION_BPTC  },
     {"GL_ARB_texture_compression_rgtc",     ARB_TEXTURE_COMPRESSION_RGTC  },
@@ -2771,6 +2772,8 @@ static void load_gl_funcs(struct wined3d_gl_info *gl_info)
     USE_GL_FUNC(glGetSynciv)
     USE_GL_FUNC(glIsSync)
     USE_GL_FUNC(glWaitSync)
+    /* GL_ARB_texture_buffer_range */
+    USE_GL_FUNC(glTexBufferRange)
     /* GL_ARB_texture_compression */
     USE_GL_FUNC(glCompressedTexImage2DARB)
     USE_GL_FUNC(glCompressedTexImage3DARB)
