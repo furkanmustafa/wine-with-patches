@@ -976,6 +976,13 @@ static HRESULT shader_get_registers_used(struct wined3d_shader *shader, const st
                     break;
             }
         }
+        else if (ins.handler_idx == WINED3DSIH_DCL_INPUT_PS)
+        {
+            unsigned int reg_idx = ins.declaration.dst.reg.idx[0].offset;
+            reg_maps->input_registers |= 1u << reg_idx;
+            /* We can assume we are in the pixel shader */
+            shader->u.ps.input_reg_flags[reg_idx] = ins.flags;
+        }
         else if (ins.handler_idx == WINED3DSIH_DCL_CONSTANT_BUFFER)
         {
             struct wined3d_shader_register *reg = &ins.declaration.src.reg;
