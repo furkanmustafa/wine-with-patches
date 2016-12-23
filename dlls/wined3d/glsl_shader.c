@@ -6299,26 +6299,15 @@ static void shader_glsl_prologue_ps(const struct wined3d_shader_context *ctx)
 
     /* Pixel shaders < 2.0 place the resulting color in R0 implicitly */
     if (reg_maps->shader_version.major < 2)
-        shader_addline(buffer, "%s[0] = R0;\n", get_fragment_output(gl_info));
         shader_addline(ctx->buffer, "%s[0] = R0;\n", get_fragment_output(gl_info));
 
     if (args->srgb_correction)
-        shader_glsl_generate_srgb_write_correction(buffer, gl_info);
         shader_glsl_generate_srgb_write_correction(ctx->buffer, gl_info);
 
     /* SM < 3 does not replace the fog stage. */
     if (reg_maps->shader_version.major < 3)
-        shader_glsl_generate_fog_code(buffer, gl_info, args->fog);
-
-    shader_glsl_generate_alpha_test(buffer, gl_info, args->alpha_test_func + 1);
-
-    shader_addline(buffer, "}\n");
-
-    TRACE("Compiling shader object %u.\n", shader_id);
-    shader_glsl_compile(gl_info, shader_id, buffer->buffer);
         shader_glsl_generate_fog_code(ctx->buffer, gl_info, args->fog);
 
-    return shader_id;
     shader_glsl_generate_alpha_test(ctx->buffer, gl_info, args->alpha_test_func + 1);
 }
 

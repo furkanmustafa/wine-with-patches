@@ -394,7 +394,7 @@ void * CDECL wined3d_shader_resource_view_get_parent(const struct wined3d_shader
 }
 
 static void wined3d_shader_resource_view_create_buffer_view(struct wined3d_shader_resource_view *view,
-        const struct wined3d_shader_resource_view_desc *desc, struct wined3d_buffer *buffer,
+        const struct wined3d_view_desc *desc, struct wined3d_buffer *buffer,
         const struct wined3d_format *view_format)
 {
     const struct wined3d_gl_info *gl_info;
@@ -405,8 +405,8 @@ static void wined3d_shader_resource_view_create_buffer_view(struct wined3d_shade
 
     wined3d_buffer_load_location(buffer, context, WINED3D_LOCATION_BUFFER);
 
-    gl_info->gl_ops.gl.p_glGenTextures(1, &view->object);
-    gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_BUFFER, view->object);
+    gl_info->gl_ops.gl.p_glGenTextures(1, &view->gl_view.name);
+    gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_BUFFER, view->gl_view.name);
 
     GL_EXTCALL(glTexBufferRange(GL_TEXTURE_BUFFER, view_format->glInternal, buffer->buffer_object,
             desc->u.buffer.start_idx * view_format->byte_count, desc->u.buffer.count * view_format->byte_count));
@@ -440,7 +440,7 @@ static HRESULT wined3d_shader_resource_view_init(struct wined3d_shader_resource_
     {
         struct wined3d_buffer *buffer = buffer_from_resource(resource);
 
-        view->target = GL_TEXTURE_BUFFER;
+        view->gl_view.target = GL_TEXTURE_BUFFER;
         wined3d_shader_resource_view_create_buffer_view(view, desc, buffer, view_format);
     }
     else

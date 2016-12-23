@@ -2145,6 +2145,7 @@ void shader_generate_main(const struct wined3d_shader *shader, struct wined3d_st
     struct wined3d_shader_tex_mx tex_mx;
     struct wined3d_shader_context ctx;
     const DWORD *ptr = byte_code;
+    enum WINED3D_SHADER_INSTRUCTION_HANDLER last_opcode = WINED3DSIH_TABLE_SIZE;
 
     /* Initialize current parsing state. */
     tex_mx.current_row = 0;
@@ -2179,6 +2180,16 @@ void shader_generate_main(const struct wined3d_shader *shader, struct wined3d_st
             FIXME("Predicates not implemented.\n");
 
         /* Call appropriate function for output target */
+        device->shader_backend->shader_handle_instruction(&ins);
+        last_opcode = ins.handler_idx;
+    }
+
+    if (last_opcode != WINED3DSIH_RET)
+    {
+        /* Force a return instruction at the end of function body. */
+        memset(&ins, 0, sizeof(ins));
+        ins.ctx = &ctx;
+        ins.handler_idx = WINED3DSIH_RET;
         device->shader_backend->shader_handle_instruction(&ins);
     }
 }
