@@ -182,6 +182,8 @@
 WINE_DEFAULT_DEBUG_CHANNEL(winsock);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
+static int network_disabled;
+
 /* names of the protocols */
 static const WCHAR NameIpxW[]   = {'I', 'P', 'X', '\0'};
 static const WCHAR NameSpxW[]   = {'S', 'P', 'X', '\0'};
@@ -1288,6 +1290,9 @@ BOOL WINAPI DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID fImpLoad)
     TRACE("%p 0x%x %p\n", hInstDLL, fdwReason, fImpLoad);
     switch (fdwReason) {
     case DLL_PROCESS_ATTACH:
+        network_disabled = GetEnvironmentVariableA("WINENONET", NULL, 0);
+        if (network_disabled)
+            WARN("Running without support to connect or send data\n");
         break;
     case DLL_PROCESS_DETACH:
         if (fImpLoad) break;
@@ -2535,6 +2540,12 @@ static int WS2_send( int fd, struct ws2_async *wsa, int flags )
     union generic_unix_sockaddr unix_addr;
     int n, ret;
 
+    if (network_disabled)
+    {
+        errno = EHOSTUNREACH;
+        return -1;
+    }
+
     hdr.msg_name = NULL;
     hdr.msg_namelen = 0;
 
@@ -3427,6 +3438,9 @@ static int do_connect(int fd, const struct WS_sockaddr* name, int namelen)
 
     if (!uaddrlen)
         return WSAEFAULT;
+
+    if (network_disabled)
+        return WSAEHOSTUNREACH;
 
     if (name->sa_family == WS_AF_INET)
     {
