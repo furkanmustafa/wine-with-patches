@@ -829,6 +829,11 @@ static HRESULT swapchain_init(struct wined3d_swapchain *swapchain, struct wined3
         swapchain->swapchain_ops = &swapchain_gl_ops;
 
     window = desc->device_window ? desc->device_window : device->create_parms.focus_window;
+    if (window == GetDesktopWindow())
+    {
+        window = CreateWindowA("static", "foo", WS_VISIBLE, 0, 0, 640, 480, NULL, NULL, NULL, NULL);
+        ERR("Fake window %p\n", window);
+    }
 
     swapchain->device = device;
     swapchain->parent = parent;
