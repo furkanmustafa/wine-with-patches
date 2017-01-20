@@ -775,8 +775,8 @@ static void create_dummy_textures(struct wined3d_device *device, struct wined3d_
         gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_1D_ARRAY, device->dummy_textures.tex_1d_array);
         checkGLcall("glBindTexture");
 
-        GL_EXTCALL(glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_RGBA8, 1, 1, 0,
-                    GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, &color));
+        gl_info->gl_ops.gl.p_glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_RGBA8, 1, 1, 0,
+                    GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, &color);
         checkGLcall("glTexImage2D");
 
         gl_info->gl_ops.gl.p_glGenTextures(1, &device->dummy_textures.tex_2d_array);
