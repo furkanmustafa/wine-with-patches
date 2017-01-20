@@ -4390,14 +4390,15 @@ static const GUID d3d9_private_data_test_guid =
 static void test_fpu_setup(void)
 {
 #if defined(D3D9_TEST_SET_FPU_CW) && defined(D3D9_TEST_GET_FPU_CW)
+    static const BOOL is_64bit = sizeof(void *) > sizeof(int);
+    IUnknown dummy_object = {&dummy_object_vtbl};
     struct device_desc device_desc;
+    IDirect3DSurface9 *surface;
     IDirect3DDevice9 *device;
+    WORD cw, expected_cw;
     HWND window = NULL;
     IDirect3D9 *d3d9;
-    WORD cw;
-    IDirect3DSurface9 *surface;
     HRESULT hr;
-    IUnknown dummy_object = {&dummy_object_vtbl};
 
     window = CreateWindowA("d3d9_test_wc", "d3d9_test", WS_CAPTION, 0, 0,
             registry_mode.dmPelsWidth, registry_mode.dmPelsHeight, 0, 0, 0, 0);
@@ -4421,8 +4422,11 @@ static void test_fpu_setup(void)
         goto done;
     }
 
+    expected_cw = is_64bit ? 0xf60 : 0x7f;
+
     cw = get_fpu_cw();
-    ok(cw == 0x7f, "cw is %#x, expected 0x7f.\n", cw);
+    todo_wine_if(is_64bit)
+    ok(cw == expected_cw, "cw is %#x, expected %#x.\n", cw, expected_cw);
 
     hr = IDirect3DDevice9_GetRenderTarget(device, 0, &surface);
     ok(SUCCEEDED(hr), "Failed to get render target surface, hr %#x.\n", hr);
@@ -4431,7 +4435,8 @@ static void test_fpu_setup(void)
     hr = IDirect3DSurface9_SetPrivateData(surface, &d3d9_private_data_test_guid,
             &dummy_object, sizeof(IUnknown *), D3DSPD_IUNKNOWN);
     ok(SUCCEEDED(hr), "Failed to set private data, hr %#x.\n", hr);
-    ok(callback_cw == 0x7f, "Callback cw is %#x, expected 0x7f.\n", callback_cw);
+    todo_wine_if(is_64bit)
+    ok(callback_cw == expected_cw, "Callback cw is %#x, expected %#x.\n", callback_cw, expected_cw);
     ok(callback_tid == GetCurrentThreadId(), "Got unexpected thread id.\n");
     cw = get_fpu_cw();
     ok(cw == 0xf60, "cw is %#x, expected 0xf60.\n", cw);
@@ -7296,12 +7301,12 @@ static void test_lockrect_invalid(void)
     IDirect3DDevice9 *device;
     IDirect3DTexture9 *texture;
     IDirect3DCubeTexture9 *cube_texture;
-    IDirect3D9 *d3d;
+    HRESULT hr, expected_hr;
     unsigned int i, r;
+    IDirect3D9 *d3d;
     ULONG refcount;
     HWND window;
     BYTE *base;
-    HRESULT hr;
     static const struct
     {
         D3DRESOURCETYPE type;
@@ -7374,6 +7379,9 @@ static void test_lockrect_invalid(void)
         base = locked_rect.pBits;
         hr = IDirect3DSurface9_UnlockRect(surface);
         ok(SUCCEEDED(hr), "Failed to unlock surface, hr %#x, type %s.\n", hr, resources[r].name);
+        expected_hr = resources[r].type == D3DRTYPE_TEXTURE ? D3D_OK : D3DERR_INVALIDCALL;
+        hr = IDirect3DSurface9_UnlockRect(surface);
+        ok(hr == expected_hr, "Got hr %#x, expected %#x, type %s.\n", hr, expected_hr, resources[r].name);
 
         for (i = 0; i < sizeof(test_data) / sizeof(*test_data); ++i)
         {
@@ -7485,6 +7493,8 @@ static void test_lockrect_invalid(void)
             ok(hr == D3DERR_INVALIDCALL, "Got unexpected hr %#x, type %s.\n", hr, resources[r].name);
             hr = IDirect3DTexture9_UnlockRect(texture, 0);
             ok(SUCCEEDED(hr), "Failed to unlock texture, hr %#x, type %s.\n", hr, resources[r].name);
+            hr = IDirect3DTexture9_UnlockRect(texture, 0);
+            ok(hr == D3D_OK, "Got unexpected hr %#x, type %s.\n", hr, resources[r].name);
 
             hr = IDirect3DTexture9_LockRect(texture, 0, &locked_rect, &test_data[0].rect, 0);
             ok(hr == D3D_OK, "Got unexpected hr %#x for rect %s, type %s.\n",
@@ -7519,6 +7529,8 @@ static void test_lockrect_invalid(void)
             ok(hr == D3DERR_INVALIDCALL, "Got unexpected hr %#x, type %s.\n", hr, resources[r].name);
             hr = IDirect3DCubeTexture9_UnlockRect(cube_texture, D3DCUBEMAP_FACE_NEGATIVE_X, 0);
             ok(SUCCEEDED(hr), "Failed to unlock texture, hr %#x, type %s.\n", hr, resources[r].name);
+            hr = IDirect3DCubeTexture9_UnlockRect(cube_texture, D3DCUBEMAP_FACE_NEGATIVE_X, 0);
+            todo_wine ok(hr == D3D_OK, "Got unexpected hr %#x, type %s.\n", hr, resources[r].name);
 
             hr = IDirect3DCubeTexture9_LockRect(cube_texture, D3DCUBEMAP_FACE_NEGATIVE_X, 0,
                     &locked_rect, &test_data[0].rect, 0);
@@ -11343,6 +11355,64 @@ static void test_get_render_target_data(void)
     DestroyWindow(window);
 }
 
+static void test_render_target_device_mismatch(void)
+{
+    IDirect3DDevice9 *device, *device2;
+    IDirect3DSurface9 *surface, *rt;
+    IDirect3D9 *d3d;
+    UINT refcount;
+    HWND window;
+    HRESULT hr;
+
+    window = CreateWindowA("static", "d3d9_test", WS_OVERLAPPEDWINDOW,
+            0, 0, 640, 480, NULL, NULL, NULL, NULL);
+    d3d = Direct3DCreate9(D3D_SDK_VERSION);
+    ok(!!d3d, "Failed to create a D3D object.\n");
+    if (!(device = create_device(d3d, window, NULL)))
+    {
+        skip("Failed to create a D3D device.\n");
+        IDirect3D9_Release(d3d);
+        DestroyWindow(window);
+        return;
+    }
+
+    hr = IDirect3DDevice9_GetRenderTarget(device, 0, &rt);
+    ok(SUCCEEDED(hr), "Failed to get render target, hr %#x.\n", hr);
+
+    device2 = create_device(d3d, window, NULL);
+    ok(!!device2, "Failed to create a D3D device.\n");
+
+    hr = IDirect3DDevice9_CreateRenderTarget(device2, 640, 480,
+            D3DFMT_A8R8G8B8, D3DMULTISAMPLE_NONE, 0, FALSE, &surface, NULL);
+    ok(SUCCEEDED(hr), "Failed to create render target, hr %#x.\n", hr);
+
+    hr = IDirect3DDevice9_SetRenderTarget(device, 0, surface);
+    ok(hr == D3DERR_INVALIDCALL, "Got unexpected hr %#x.\n", hr);
+
+    IDirect3DSurface9_Release(surface);
+
+    hr = IDirect3DDevice9_GetRenderTarget(device2, 0, &surface);
+    ok(SUCCEEDED(hr), "Failed to get render target, hr %#x.\n", hr);
+
+    hr = IDirect3DDevice9_SetRenderTarget(device, 0, surface);
+    ok(hr == D3DERR_INVALIDCALL, "Got unexpected hr %#x.\n", hr);
+
+    IDirect3DSurface9_Release(surface);
+
+    hr = IDirect3DDevice9_GetRenderTarget(device, 0, &surface);
+    ok(SUCCEEDED(hr), "Failed to get render target, hr %#x.\n", hr);
+    ok(surface == rt, "Got unexpected render target %p, expected %p.\n", surface, rt);
+    IDirect3DSurface9_Release(surface);
+    IDirect3DSurface9_Release(rt);
+
+    refcount = IDirect3DDevice9_Release(device);
+    ok(!refcount, "Device has %u references left.\n", refcount);
+    refcount = IDirect3DDevice9_Release(device2);
+    ok(!refcount, "Device has %u references left.\n", refcount);
+    IDirect3D9_Release(d3d);
+    DestroyWindow(window);
+}
+
 START_TEST(device)
 {
     WNDCLASSA wc = {0};
@@ -11459,6 +11529,7 @@ START_TEST(device)
     test_check_device_format();
     test_miptree_layout();
     test_get_render_target_data();
+    test_render_target_device_mismatch();
 
     UnregisterClassA("d3d9_test_wc", GetModuleHandleA(NULL));
 }

@@ -3010,8 +3010,8 @@ static void test_create_rendertarget_view(void)
 
     rtv_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_BUFFER;
-    U(rtv_desc).Buffer.ElementOffset = 0;
-    U(rtv_desc).Buffer.ElementWidth = 64;
+    U1(U(rtv_desc).Buffer).ElementOffset = 0;
+    U2(U(rtv_desc).Buffer).ElementWidth = 64;
 
     hr = ID3D11Device_CreateRenderTargetView(device, NULL, &rtv_desc, &rtview);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
@@ -3317,8 +3317,8 @@ static void test_create_shader_resource_view(void)
 
     srv_desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
     srv_desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
-    U(srv_desc).Buffer.ElementOffset = 0;
-    U(srv_desc).Buffer.ElementWidth = 64;
+    U1(U(srv_desc).Buffer).ElementOffset = 0;
+    U2(U(srv_desc).Buffer).ElementWidth = 64;
 
     hr = ID3D11Device_CreateShaderResourceView(device, NULL, &srv_desc, &srview);
     ok(hr == E_INVALIDARG, "Got unexpected hr %#x.\n", hr);
@@ -3369,10 +3369,10 @@ static void test_create_shader_resource_view(void)
         ok(srv_desc.Format == DXGI_FORMAT_UNKNOWN, "Got unexpected format %#x.\n", srv_desc.Format);
         ok(srv_desc.ViewDimension == D3D11_SRV_DIMENSION_BUFFER, "Got unexpected view dimension %#x.\n",
                 srv_desc.ViewDimension);
-        ok(!U(srv_desc).Buffer.FirstElement, "Got unexpected first element %u.\n",
-                U(srv_desc).Buffer.FirstElement);
-        ok(U(srv_desc).Buffer.NumElements == 256, "Got unexpected num elements %u.\n",
-                U(srv_desc).Buffer.NumElements);
+        ok(!U1(U(srv_desc).Buffer).FirstElement, "Got unexpected first element %u.\n",
+                U1(U(srv_desc).Buffer).FirstElement);
+        ok(U2(U(srv_desc).Buffer).NumElements == 256, "Got unexpected num elements %u.\n",
+                U2(U(srv_desc).Buffer).NumElements);
 
         ID3D11ShaderResourceView_Release(srview);
         ID3D11Buffer_Release(buffer);
@@ -12664,6 +12664,40 @@ static void test_sm5_bufinfo_instruction(void)
     release_test_context(&test_context);
 }
 
+static void test_render_target_device_mismatch(void)
+{
+    struct d3d11_test_context test_context;
+    struct device_desc device_desc = {0};
+    ID3D11DeviceContext *context;
+    ID3D11RenderTargetView *rtv;
+    ID3D11Device *device;
+    ULONG refcount;
+
+    if (!init_test_context(&test_context, NULL))
+        return;
+
+    device = create_device(&device_desc);
+    ok(!!device, "Failed to create device.\n");
+
+    ID3D11Device_GetImmediateContext(device, &context);
+
+    rtv = (ID3D11RenderTargetView *)0xdeadbeef;
+    ID3D11DeviceContext_OMGetRenderTargets(context, 1, &rtv, NULL);
+    ok(!rtv, "Got unexpected render target view %p.\n", rtv);
+    ID3D11DeviceContext_OMSetRenderTargets(context, 1, &test_context.backbuffer_rtv, NULL);
+    ID3D11DeviceContext_OMGetRenderTargets(context, 1, &rtv, NULL);
+    ok(rtv == test_context.backbuffer_rtv, "Got unexpected render target view %p.\n", rtv);
+    ID3D11RenderTargetView_Release(rtv);
+
+    rtv = NULL;
+    ID3D11DeviceContext_OMSetRenderTargets(context, 1, &rtv, NULL);
+
+    ID3D11DeviceContext_Release(context);
+    refcount = ID3D11Device_Release(device);
+    ok(!refcount, "Device has %u references left.\n", refcount);
+    release_test_context(&test_context);
+}
+
 START_TEST(d3d11)
 {
     test_create_device();
@@ -12732,4 +12766,5 @@ START_TEST(d3d11)
     test_sm4_ret_instruction();
     test_primitive_restart();
     test_sm5_bufinfo_instruction();
+    test_render_target_device_mismatch();
 }

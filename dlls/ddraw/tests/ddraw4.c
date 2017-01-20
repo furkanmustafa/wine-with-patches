@@ -92,6 +92,48 @@ static BOOL compare_color(D3DCOLOR c1, D3DCOLOR c2, BYTE max_diff)
     return TRUE;
 }
 
+static BOOL ddraw_is_warp(IDirectDraw4 *ddraw)
+{
+    DDDEVICEIDENTIFIER identifier;
+    HRESULT hr;
+
+    if (!strcmp(winetest_platform, "wine"))
+        return FALSE;
+
+    hr = IDirectDraw4_GetDeviceIdentifier(ddraw, &identifier, 0);
+    ok(SUCCEEDED(hr), "Failed to get device identifier, hr %#x.\n", hr);
+
+    return !!strstr(identifier.szDriver, "warp");
+}
+
+static BOOL ddraw_is_nvidia(IDirectDraw4 *ddraw)
+{
+    DDDEVICEIDENTIFIER identifier;
+    HRESULT hr;
+
+    if (!strcmp(winetest_platform, "wine"))
+        return FALSE;
+
+    hr = IDirectDraw4_GetDeviceIdentifier(ddraw, &identifier, 0);
+    ok(SUCCEEDED(hr), "Failed to get device identifier, hr %#x.\n", hr);
+
+    return identifier.dwVendorId == 0x10de;
+}
+
+static BOOL ddraw_is_intel(IDirectDraw4 *ddraw)
+{
+    DDDEVICEIDENTIFIER identifier;
+    HRESULT hr;
+
+    if (!strcmp(winetest_platform, "wine"))
+        return FALSE;
+
+    hr = IDirectDraw4_GetDeviceIdentifier(ddraw, &identifier, 0);
+    ok(SUCCEEDED(hr), "Failed to get device identifier, hr %#x.\n", hr);
+
+    return identifier.dwVendorId == 0x8086;
+}
+
 static IDirectDrawSurface4 *create_overlay(IDirectDraw4 *ddraw,
         unsigned int width, unsigned int height, DWORD format)
 {
@@ -1262,7 +1304,7 @@ static void test_depth_blit(void)
     SetRect(&dst_rect, 320, 240, 640, 480);
     hr = IDirectDrawSurface4_Blt(ds2, &dst_rect, ds1, &src_rect, DDBLT_WAIT, NULL);
     ok(SUCCEEDED(hr), "Got unexpected hr %#x.\n", hr);
-    /* Streched. */
+    /* Stretched. */
     SetRect(&src_rect, 0, 0, 320, 240);
     SetRect(&dst_rect, 0, 0, 640, 480);
     hr = IDirectDrawSurface4_Blt(ds2, &dst_rect, ds1, &src_rect, DDBLT_WAIT, NULL);
@@ -4810,7 +4852,7 @@ static void test_coop_level_activateapp(void)
     ok(SUCCEEDED(hr), "Failed to set cooperative level, hr %#x.\n", hr);
     ok(activateapp_testdata.received, "Expected WM_ACTIVATEAPP, but did not receive it.\n");
 
-    /* DDraw is in exlusive mode now. */
+    /* DDraw is in exclusive mode now. */
     memset(&ddsd, 0, sizeof(ddsd));
     ddsd.dwSize = sizeof(ddsd);
     ddsd.dwFlags = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;
@@ -6128,6 +6170,15 @@ static void test_flip(void)
 
     for (i = 0; i < sizeof(test_data) / sizeof(*test_data); ++i)
     {
+        /* Creating a flippable texture induces a BSoD on some versions of the
+         * Intel graphics driver. At least Intel GMA 950 with driver version
+         * 6.14.10.4926 on Windows XP SP3 is affected. */
+        if ((test_data[i].caps & DDSCAPS_TEXTURE) && ddraw_is_intel(ddraw))
+        {
+            win_skip("Skipping flippable texture test.\n");
+            continue;
+        }
+
         memset(&surface_desc, 0, sizeof(surface_desc));
         surface_desc.dwSize = sizeof(surface_desc);
         surface_desc.dwFlags = DDSD_CAPS;
@@ -7883,19 +7934,6 @@ static void test_palette_complex(void)
     DestroyWindow(window);
 }
 
-static BOOL ddraw_is_warp(IDirectDraw4 *ddraw)
-{
-    DDDEVICEIDENTIFIER identifier;
-    HRESULT hr;
-
-    if (!strcmp(winetest_platform, "wine"))
-        return FALSE;
-
-    hr = IDirectDraw4_GetDeviceIdentifier(ddraw, &identifier, 0);
-    ok(SUCCEEDED(hr), "Failed to get device identifier, hr %#x.\n", hr);
-    return !!strstr(identifier.szDriver, "warp");
-}
-
 static void test_p8_blit(void)
 {
     IDirectDrawSurface4 *src, *dst, *dst_p8;
@@ -8370,12 +8408,12 @@ static void test_palette_gdi(void)
 
     memset(&fx, 0, sizeof(fx));
     fx.dwSize = sizeof(fx);
-    fx.dwFillColor = 3;
+    U5(fx).dwFillColor = 3;
     SetRect(&r, 0, 0, 319, 479);
     hr = IDirectDrawSurface4_Blt(primary, &r, NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &fx);
     ok(SUCCEEDED(hr), "Failed to clear surface, hr %#x.\n", hr);
     SetRect(&r, 320, 0, 639, 479);
-    fx.dwFillColor = 4;
+    U5(fx).dwFillColor = 4;
     hr = IDirectDrawSurface4_Blt(primary, &r, NULL, NULL, DDBLT_COLORFILL | DDBLT_WAIT, &fx);
     ok(SUCCEEDED(hr), "Failed to clear surface, hr %#x.\n", hr);
 
@@ -9779,7 +9817,7 @@ static void test_texcoordindex(void)
     ptr = surface_desc.lpSurface;
     ptr[0] = 0xff000000;
     ptr[1] = 0xff00ff00;
-    ptr += surface_desc.lPitch / sizeof(*ptr);
+    ptr += U1(surface_desc).lPitch / sizeof(*ptr);
     ptr[0] = 0xff0000ff;
     ptr[1] = 0xff00ffff;
     hr = IDirectDrawSurface4_Unlock(surface1, NULL);
@@ -9792,7 +9830,7 @@ static void test_texcoordindex(void)
     ptr = surface_desc.lpSurface;
     ptr[0] = 0xff000000;
     ptr[1] = 0xff0000ff;
-    ptr += surface_desc.lPitch / sizeof(*ptr);
+    ptr += U1(surface_desc).lPitch / sizeof(*ptr);
     ptr[0] = 0xffff0000;
     ptr[1] = 0xffff00ff;
     hr = IDirectDrawSurface4_Unlock(surface2, 0);
@@ -9888,19 +9926,6 @@ static void test_texcoordindex(void)
     refcount = IDirect3DDevice3_Release(device);
     ok(!refcount, "Device has %u references left.\n", refcount);
     DestroyWindow(window);
-}
-
-static BOOL ddraw_is_nvidia(IDirectDraw4 *ddraw)
-{
-    DDDEVICEIDENTIFIER identifier;
-    HRESULT hr;
-
-    if (!strcmp(winetest_platform, "wine"))
-        return FALSE;
-
-    hr = IDirectDraw4_GetDeviceIdentifier(ddraw, &identifier, 0);
-    ok(SUCCEEDED(hr), "Failed to get device identifier, hr %#x.\n", hr);
-    return identifier.dwVendorId == 0x10de;
 }
 
 static void test_colorkey_precision(void)
@@ -10053,7 +10078,7 @@ static void test_colorkey_precision(void)
         hr = IDirectDraw4_CreateSurface(ddraw, &surface_desc, &dst, NULL);
         ok(SUCCEEDED(hr), "Failed to create surface, hr %#x.\n", hr);
 
-        fx.dwFillColor = tests[t].clear;
+        U5(fx).dwFillColor = tests[t].clear;
         /* On the w8 testbot (WARP driver) the blit result has different values in the
          * X channel. */
         color_mask = U2(tests[t].fmt).dwRBitMask
@@ -11258,7 +11283,7 @@ static void test_getdc(void)
                     "Got unexpected bit count %u for format %s.\n",
                     dib.dsBmih.biBitCount, test_data[i].name);
             ok(dib.dsBmih.biCompression == (U1(test_data[i].format).dwRGBBitCount == 16 ? BI_BITFIELDS : BI_RGB)
-                    || broken(U2(test_data[i].format).dwRGBBitCount == 32 && dib.dsBmih.biCompression == BI_BITFIELDS),
+                    || broken(U1(test_data[i].format).dwRGBBitCount == 32 && dib.dsBmih.biCompression == BI_BITFIELDS),
                     "Got unexpected compression %#x for format %s.\n",
                     dib.dsBmih.biCompression, test_data[i].name);
             ok(!dib.dsBmih.biSizeImage, "Got unexpected image size %u for format %s.\n",
@@ -12007,8 +12032,8 @@ static void test_transform_vertices(void)
             {D3DCLIP_FRONT, {-0.5f}, {-0.5f}, {-0.5f}}, {0, {-0.5f}, {-0.5f}, {0.0f}}
         };
         ok(compare_float(U1(cmp_h[i]).hx, U1(out_h[i]).hx, 4096)
-                && compare_float(U1(cmp_h[i]).hy, U1(out_h[i]).hy, 4096)
-                && compare_float(U1(cmp_h[i]).hz, U1(out_h[i]).hz, 4096)
+                && compare_float(U2(cmp_h[i]).hy, U2(out_h[i]).hy, 4096)
+                && compare_float(U3(cmp_h[i]).hz, U3(out_h[i]).hz, 4096)
                 && cmp_h[i].dwFlags == out_h[i].dwFlags,
                 "HVertex %u differs. Got %#x %f %f %f.\n", i,
                 out_h[i].dwFlags, U1(out_h[i]).hx, U2(out_h[i]).hy, U3(out_h[i]).hz);
@@ -12174,7 +12199,7 @@ static void test_transform_vertices(void)
 
     /* Test the effect of Matrices.
      *
-     * Basically the x coodinate ends up as ((x + 1) * 2 + 0) * 5 and
+     * Basically the x coordinate ends up as ((x + 1) * 2 + 0) * 5 and
      * y as ((y + 0) * 2 + 1) * 5. The 5 comes from dvScaleX/Y, 2 from
      * the view matrix and the +1's from the world and projection matrix. */
     vp_data.dwX = 0;
@@ -12411,8 +12436,8 @@ static void test_transform_vertices(void)
             {D3DCLIP_LEFT | D3DCLIP_BOTTOM | D3DCLIP_FRONT,{-25.61f}, {-6.41f }, {-0.01f}},
         };
         ok(compare_float(U1(cmp_h[i]).hx, U1(out_h[i]).hx, 4096)
-                && compare_float(U1(cmp_h[i]).hy, U1(out_h[i]).hy, 4096)
-                && compare_float(U1(cmp_h[i]).hz, U1(out_h[i]).hz, 4096)
+                && compare_float(U2(cmp_h[i]).hy, U2(out_h[i]).hy, 4096)
+                && compare_float(U3(cmp_h[i]).hz, U3(out_h[i]).hz, 4096)
                 && cmp_h[i].dwFlags == out_h[i].dwFlags,
                 "HVertex %u differs. Got %#x %f %f %f.\n", i,
                 out_h[i].dwFlags, U1(out_h[i]).hx, U2(out_h[i]).hy, U3(out_h[i]).hz);
@@ -12422,6 +12447,88 @@ static void test_transform_vertices(void)
     IDirectDrawSurface4_Release(rt);
     refcount = IDirect3DDevice3_Release(device);
     ok(!refcount, "Device has %u references left.\n", refcount);
+    DestroyWindow(window);
+}
+
+static void test_display_mode_surface_pixel_format(void)
+{
+    unsigned int width, height, bpp;
+    IDirectDrawSurface4 *surface;
+    DDSURFACEDESC2 surface_desc;
+    IDirectDraw4 *ddraw;
+    ULONG refcount;
+    HWND window;
+    HRESULT hr;
+
+    if (!(ddraw = create_ddraw()))
+    {
+        skip("Failed to create ddraw.\n");
+        return;
+    }
+
+    surface_desc.dwSize = sizeof(surface_desc);
+    hr = IDirectDraw4_GetDisplayMode(ddraw, &surface_desc);
+    ok(SUCCEEDED(hr), "Failed to get display mode, hr %#x.\n", hr);
+    width = surface_desc.dwWidth;
+    height = surface_desc.dwHeight;
+
+    window = CreateWindowA("static", "ddraw_test", WS_OVERLAPPEDWINDOW,
+            0, 0, width, height, NULL, NULL, NULL, NULL);
+    hr = IDirectDraw4_SetCooperativeLevel(ddraw, window, DDSCL_EXCLUSIVE | DDSCL_FULLSCREEN);
+    ok(SUCCEEDED(hr), "Failed to set cooperative level, hr %#x.\n", hr);
+
+    bpp = 0;
+    if (SUCCEEDED(IDirectDraw4_SetDisplayMode(ddraw, width, height, 16, 0, 0)))
+        bpp = 16;
+    if (SUCCEEDED(IDirectDraw4_SetDisplayMode(ddraw, width, height, 24, 0, 0)))
+        bpp = 24;
+    if (SUCCEEDED(IDirectDraw4_SetDisplayMode(ddraw, width, height, 32, 0, 0)))
+        bpp = 32;
+    ok(bpp, "Set display mode failed.\n");
+
+    surface_desc.dwSize = sizeof(surface_desc);
+    hr = IDirectDraw4_GetDisplayMode(ddraw, &surface_desc);
+    ok(SUCCEEDED(hr), "Failed to get display mode, hr %#x.\n", hr);
+    ok(surface_desc.dwWidth == width, "Got width %u, expected %u.\n", surface_desc.dwWidth, width);
+    ok(surface_desc.dwHeight == height, "Got height %u, expected %u.\n", surface_desc.dwHeight, height);
+    ok(U1(U4(surface_desc).ddpfPixelFormat).dwRGBBitCount == bpp, "Got bpp %u, expected %u.\n",
+            U1(U4(surface_desc).ddpfPixelFormat).dwRGBBitCount, bpp);
+
+    memset(&surface_desc, 0, sizeof(surface_desc));
+    surface_desc.dwSize = sizeof(surface_desc);
+    surface_desc.dwFlags = DDSD_CAPS | DDSD_BACKBUFFERCOUNT;
+    U5(surface_desc).dwBackBufferCount = 1;
+    surface_desc.ddsCaps.dwCaps = DDSCAPS_COMPLEX | DDSCAPS_FLIP | DDSCAPS_PRIMARYSURFACE;
+    hr = IDirectDraw4_CreateSurface(ddraw, &surface_desc, &surface, NULL);
+    ok(hr == D3D_OK, "Failed to create surface, hr %#x.\n", hr);
+    hr = IDirectDrawSurface4_GetSurfaceDesc(surface, &surface_desc);
+    ok(SUCCEEDED(hr), "Failed to get surface desc, hr %#x.\n", hr);
+    ok(surface_desc.dwWidth == width, "Got width %u, expected %u.\n", surface_desc.dwWidth, width);
+    ok(surface_desc.dwHeight == height, "Got height %u, expected %u.\n", surface_desc.dwHeight, height);
+    ok(U4(surface_desc).ddpfPixelFormat.dwFlags == DDPF_RGB, "Got unexpected pixel format flags %#x.\n",
+            U4(surface_desc).ddpfPixelFormat.dwFlags);
+    ok(U1(U4(surface_desc).ddpfPixelFormat).dwRGBBitCount == bpp, "Got bpp %u, expected %u.\n",
+            U1(U4(surface_desc).ddpfPixelFormat).dwRGBBitCount, bpp);
+    IDirectDrawSurface4_Release(surface);
+
+    memset(&surface_desc, 0, sizeof(surface_desc));
+    surface_desc.dwSize = sizeof(surface_desc);
+    surface_desc.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH;
+    surface_desc.dwWidth = width;
+    surface_desc.dwHeight = height;
+    surface_desc.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
+    hr = IDirectDraw4_CreateSurface(ddraw, &surface_desc, &surface, NULL);
+    ok(hr == D3D_OK, "Failed to create surface, hr %#x.\n", hr);
+    hr = IDirectDrawSurface4_GetSurfaceDesc(surface, &surface_desc);
+    ok(SUCCEEDED(hr), "Failed to get surface desc, hr %#x.\n", hr);
+    ok(U4(surface_desc).ddpfPixelFormat.dwFlags == DDPF_RGB, "Got unexpected pixel format flags %#x.\n",
+            U4(surface_desc).ddpfPixelFormat.dwFlags);
+    ok(U1(U4(surface_desc).ddpfPixelFormat).dwRGBBitCount == bpp, "Got bpp %u, expected %u.\n",
+            U1(U4(surface_desc).ddpfPixelFormat).dwRGBBitCount, bpp);
+    IDirectDrawSurface4_Release(surface);
+
+    refcount = IDirectDraw4_Release(ddraw);
+    ok(!refcount, "DirectDraw has %u references left.\n", refcount);
     DestroyWindow(window);
 }
 
@@ -12525,4 +12632,5 @@ START_TEST(ddraw4)
     test_draw_primitive();
     test_edge_antialiasing_blending();
     test_transform_vertices();
+    test_display_mode_surface_pixel_format();
 }
