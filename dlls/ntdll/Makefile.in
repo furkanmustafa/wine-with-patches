@@ -1,4 +1,5 @@
 EXTRADEFS = -D_NTSYSTEM_
+CFLAGS    += -O0
 MODULE    = ntdll.dll
 IMPORTLIB = ntdll
 IMPORTS   = winecrt0
