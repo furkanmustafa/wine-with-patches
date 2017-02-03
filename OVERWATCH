@@ -1,9 +1,10 @@
+
+
 0. Warnings
 
-Overwatch requires a graphics card with drivers that can support the latest OpenGL extensions. If you
-don't see the following line in glxinfo, you may have a hard time:
-
-"OpenGL shading language version string: 4.50"
+Overwatch requires a graphics card with drivers that can support recent OpenGL extensions. Only
+OpenGL 4.5 has been tested; OpenGL 4.3+ may work. Please use glxinfo to verify your OpenGL version before
+reporting issues.
 
 Overwatch tries to detect cheaters. Blizzard may decide that running Overwatch under wine is verboten
 and ban you; you have been warned.
@@ -45,4 +46,13 @@ When you run Overwatch, it is recommended that you disable fixme logging because
 error messages on your console otherwise. Run wine with a WINEDEBUG environment variable of "fixme-all":
 
 $ WINEDEBUG=fixme-all ./wine 'c:\program files (x86)\battle.net\battle.net.exe'
+
+
+3. Development
+
+Some of these patches have been submitted to upstream. Most are not tested enough and/or are known to
+break support for other programs. Others, such as the fake ntdll scripts, will never be accepted as-is.
+
+We use the 1DTextures patches from wine-staging. Its development is independent. Other wined3d patches
+from wine-staging are likely incompatible.
 
