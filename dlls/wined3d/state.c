@@ -4619,11 +4619,6 @@ static void viewport_miscpart(struct wined3d_context *context, const struct wine
 
     if (target)
     {
-        if (vp.width > target->width)
-            vp.width = target->width;
-        if (vp.height > target->height)
-            vp.height = target->height;
-
         wined3d_rendertarget_view_get_drawable_size(target, context, &width, &height);
     }
     else if (depth_stencil)
@@ -4663,11 +4658,6 @@ static void viewport_miscpart_cc(struct wined3d_context *context,
 
     if (target)
     {
-        if (vp.width > target->width)
-            vp.width = target->width;
-        if (vp.height > target->height)
-            vp.height = target->height;
-
         wined3d_rendertarget_view_get_drawable_size(target, context, &width, &height);
     }
     else if (depth_stencil)
