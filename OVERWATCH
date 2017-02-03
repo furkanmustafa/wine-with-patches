@@ -1,0 +1,48 @@
+0. Warnings
+
+Overwatch requires a graphics card with drivers that can support the latest OpenGL extensions. If you
+don't see the following line in glxinfo, you may have a hard time:
+
+"OpenGL shading language version string: 4.50"
+
+Overwatch tries to detect cheaters. Blizzard may decide that running Overwatch under wine is verboten
+and ban you; you have been warned.
+
+There is a good chance that when Overwatch is updated, it will stop working under wine. Even if this
+works for you currently, that is not a guarantee of future performance.
+
+Until DirectX 11 support in wine is complete, there are several graphical glitches and the frame rate may
+be horrible. Some of these issues are known and some are unknown.
+
+
+1. Build Instructions
+
+Compile wine as normal for shared WoW64 (https://wiki.winehq.org/Building_Wine#Shared_WoW64).
+
+After running make install, you need to create a fake ntdll.dll. Assuming the default paths, you might run
+the following commands:
+
+$ cp ./tools/fixup_ntdll.tmpl ~/.wine/drive_c/windows/system32/ntdll.dll
+$ ./tools/fixup_ntdll ../wine64-build/dlls/ntdll/ntdll.dll.so ~/.wine/drive_c/windows/system32/ntdll.dll 
+
+The second command is generating trampolines to the real ntdll.dll functions. It will print out whichever
+functions it couldn't handle properly. If everything is working, it will be a short list, such as:
+
+__chkstk
+DbgBreakPoint
+DbgUserBreakPoint
+LdrLoadDll
+RtlAddVectoredExceptionHandler
+RtlCaptureContext
+RtlRaiseException
+
+
+2. Running Overwatch
+
+It is recommended that you download and run Overwatch using the Battle.net client.
+
+When you run Overwatch, it is recommended that you disable fixme logging because there will be a lot of
+error messages on your console otherwise. Run wine with a WINEDEBUG environment variable of "fixme-all":
+
+$ WINEDEBUG=fixme-all ./wine 'c:\program files (x86)\battle.net\battle.net.exe'
+
