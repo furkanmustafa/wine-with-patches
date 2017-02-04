@@ -529,7 +529,7 @@ void output_exports( DLLSPEC *spec )
                 output( "\t%s %s_%s\n",
                          get_asm_ptr_keyword(), asm_name("__wine_spec_ext_link"), odp->link_name );
             }
-            else if (needs_syscalls(spec))
+            else if (needs_syscalls(spec) && odp->type != TYPE_EXTERN)
             {
                 /* system calls */
                 output( "\t%s __wine_spec_syscall_%s\n", get_asm_ptr_keyword(), odp->name );
@@ -607,7 +607,7 @@ void output_exports( DLLSPEC *spec )
             ORDDEF *odp = spec->ordinals[i];
             if (odp && (odp->flags & (FLAG_FORWARD|FLAG_EXT_LINK)) == 0)
             {
-                if (odp->type != TYPE_STUB)
+                if (odp->type != TYPE_STUB && odp->type != TYPE_EXTERN)
                 {
                     output( "__wine_spec_syscall_%s:\n", odp->name );
                     output( "\t.byte 0x0f, 0x1f, 0x44, 0x00, 0x00\n" );
