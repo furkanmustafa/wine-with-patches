@@ -20,22 +20,12 @@ be horrible. Some of these issues are known and some are unknown.
 
 Compile wine as normal for shared WoW64 (https://wiki.winehq.org/Building_Wine#Shared_WoW64).
 
-After running make install, you need to create a fake ntdll.dll. Assuming the default paths, you might run
-the following commands:
+Install as normal.
 
-$ cp ./tools/fixup_ntdll.tmpl ~/.wine/drive_c/windows/system32/ntdll.dll
-$ ./tools/fixup_ntdll ../wine64-build/dlls/ntdll/ntdll.dll.so ~/.wine/drive_c/windows/system32/ntdll.dll 
+The ntdll.dll.fake built by wine must match the one in C:\Windows\System32. Wine will do this automatically
+if it detects an update, but if you are building manually you may need to run wineboot update:
 
-The second command is generating trampolines to the real ntdll.dll functions. It will print out whichever
-functions it couldn't handle properly. If everything is working, it will be a short list, such as:
-
-__chkstk
-DbgBreakPoint
-DbgUserBreakPoint
-LdrLoadDll
-RtlAddVectoredExceptionHandler
-RtlCaptureContext
-RtlRaiseException
+$ wine wineboot --update
 
 
 2. Running Overwatch
@@ -47,11 +37,16 @@ error messages on your console otherwise. Run wine with a WINEDEBUG environment 
 
 $ WINEDEBUG=fixme-all ./wine 'c:\program files (x86)\battle.net\battle.net.exe'
 
+If you are having issues running Overwatch through the Battle.net client, then try to run it manually
+with wine:
+
+$ ./wine 'c:\program files (x86)\overwatch\overwatch.exe'
+
 
 3. Development
 
 Some of these patches have been submitted to upstream. Most are not tested enough and/or are known to
-break support for other programs. Others, such as the fake ntdll scripts, will never be accepted as-is.
+break support for other programs. Others, such as the fake ntdll patch, will never be accepted as-is.
 
 We use the 1DTextures patches from wine-staging. Its development is independent. Other wined3d patches
 from wine-staging are likely incompatible.
