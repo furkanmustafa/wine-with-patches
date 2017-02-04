@@ -66,7 +66,7 @@ int needs_get_pc_thunk = 0;
 static inline int needs_syscalls( DLLSPEC *spec )
 {
     return (target_cpu == CPU_x86 || target_cpu == CPU_x86_64) &&
-           strcmp(spec->dll_name, "ntdll") == 0;
+           spec->dll_name && strcmp(spec->dll_name, "ntdll") == 0;
 }
 
 static void add_export_func( struct export *exp, const char *name, int ordinal, unsigned int va )
