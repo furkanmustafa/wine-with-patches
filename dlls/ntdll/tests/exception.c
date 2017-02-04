@@ -2295,6 +2295,43 @@ static void test_prot_fault(void)
     }
 }
 
+static DWORD dr7_handler( EXCEPTION_RECORD *rec, EXCEPTION_REGISTRATION_RECORD *frame,
+                      CONTEXT *context, EXCEPTION_REGISTRATION_RECORD **dispatcher )
+{
+    ok( (context->Dr7 & 0xff) == 0,
+        "bad dr7 value %lx\n", context->Dr7 );
+
+    context->Rip += 1;
+    return ExceptionContinueExecution;
+}
+
+static void test_dr7(void)
+{
+    struct {
+        EXCEPTION_REGISTRATION_RECORD frame;
+        const void *context;
+    } exc_frame;
+
+    exc_frame.frame.Handler = dr7_handler;
+    exc_frame.frame.Prev = NtCurrentTeb()->Tib.ExceptionList;
+    exc_frame.context = NULL;
+
+    /* fill memory above the red zone with 0xFF */
+    asm volatile (
+        "mov $4096, %%rcx\n\t"
+        "lea -128-4096(%%rsp), %%rdi\n\t"
+        "mov $0xFF, %%rax\n\t"
+        "rep stosb\n\t"
+        : : : "rax", "rcx", "rdi"
+    );
+
+    NtCurrentTeb()->Tib.ExceptionList = &exc_frame.frame;
+    asm volatile (
+        "int3\n\t"
+    );
+    NtCurrentTeb()->Tib.ExceptionList = exc_frame.frame.Prev;
+}
+
 #endif  /* __x86_64__ */
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -2839,6 +2876,7 @@ START_TEST(exception)
     test___C_specific_handler();
     test_restore_context();
     test_prot_fault();
+    test_dr7();
 
     if (pRtlAddFunctionTable && pRtlDeleteFunctionTable && pRtlInstallFunctionTableCallback && pRtlLookupFunctionEntry)
       test_dynamic_unwind();
