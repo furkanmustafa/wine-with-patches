@@ -2840,6 +2840,22 @@ static void shader_glsl_get_register_name(const struct wined3d_shader_register *
                 sprintf(register_name, "X%u[%u]", reg->idx[0].offset, reg->idx[1].offset);
             break;
 
+        case WINED3DSPR_LOCALTHREADINDEX:
+            sprintf(register_name, "int(gl_LocalInvocationIndex)");
+            break;
+
+        case WINED3DSPR_THREADID:
+            sprintf(register_name, "ivec3(gl_GlobalInvocationID)");
+            break;
+
+        case WINED3DSPR_THREADGROUPID:
+            sprintf(register_name, "ivec3(gl_WorkGroupID)");
+            break;
+
+        case WINED3DSPR_LOCALTHREADID:
+            sprintf(register_name, "ivec3(gl_LocalInvocationID)");
+            break;
+
         default:
             FIXME("Unhandled register type %#x.\n", reg->type);
             sprintf(register_name, "unrecognized_register");
@@ -2928,7 +2944,12 @@ static void shader_glsl_add_src_param_ext(const struct wined3d_shader_instructio
     shader_glsl_get_register_name(&wined3d_src->reg, glsl_src->reg_name, &is_color, ins);
     shader_glsl_get_swizzle(wined3d_src, is_color, mask, swizzle_str);
 
-    if (wined3d_src->reg.type == WINED3DSPR_IMMCONST || wined3d_src->reg.type == WINED3DSPR_PRIMID)
+    if (wined3d_src->reg.type == WINED3DSPR_IMMCONST
+            || wined3d_src->reg.type == WINED3DSPR_PRIMID
+            || wined3d_src->reg.type == WINED3DSPR_LOCALTHREADINDEX
+            || wined3d_src->reg.type == WINED3DSPR_THREADID
+            || wined3d_src->reg.type == WINED3DSPR_THREADGROUPID
+            || wined3d_src->reg.type == WINED3DSPR_LOCALTHREADID)
     {
         shader_glsl_gen_modifier(wined3d_src->modifiers, glsl_src->reg_name, swizzle_str, glsl_src->param_str);
     }
@@ -8476,6 +8497,13 @@ static void shader_glsl_select(void *shader_priv, struct wined3d_context *contex
     }
 }
 
+/* Context activation is done by the caller. */
+static void shader_glsl_select_compute(void *shader_priv, struct wined3d_context *context,
+        const struct wined3d_state *state)
+{
+    FIXME("Compute pipeline not supported yet.\n");
+}
+
 /* "context" is not necessarily the currently active context. */
 static void shader_glsl_invalidate_current_program(struct wined3d_context *context)
 {
@@ -8801,6 +8829,7 @@ static void shader_glsl_get_caps(const struct wined3d_gl_info *gl_info, struct s
      * soon as we introduce them, adjusting the GL / GLSL version checks
      * accordingly. */
     if (gl_info->glsl_version >= MAKEDWORD_VERSION(4, 30) && gl_info->supported[WINED3D_GL_VERSION_4_3]
+            && gl_info->supported[ARB_COMPUTE_SHADER]
             && gl_info->supported[ARB_DERIVATIVE_CONTROL]
             && gl_info->supported[ARB_GPU_SHADER5]
             && gl_info->supported[ARB_SHADER_IMAGE_LOAD_STORE]
@@ -9130,6 +9159,7 @@ const struct wined3d_shader_backend_ops glsl_shader_backend =
 {
     shader_glsl_handle_instruction,
     shader_glsl_select,
+    shader_glsl_select_compute,
     shader_glsl_disable,
     shader_glsl_update_float_vertex_constants,
     shader_glsl_update_float_pixel_constants,

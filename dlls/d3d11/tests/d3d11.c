@@ -2751,8 +2751,11 @@ static void test_create_depthstencil_view(void)
             get_dsv_desc(current_desc, &tests[i].dsv_desc);
         }
 
+        expected_refcount = get_refcount((IUnknown *)texture);
         hr = ID3D11Device_CreateDepthStencilView(device, (ID3D11Resource *)texture, current_desc, &dsview);
         ok(SUCCEEDED(hr), "Test %u: Failed to create depth stencil view, hr %#x.\n", i, hr);
+        refcount = get_refcount((IUnknown *)texture);
+        ok(refcount == expected_refcount, "Got refcount %u, expected %u.\n", refcount, expected_refcount);
 
         hr = ID3D11DepthStencilView_QueryInterface(dsview, &IID_ID3D10DepthStencilView, (void **)&iface);
         ok(SUCCEEDED(hr) || broken(hr == E_NOINTERFACE) /* Not available on all Windows versions. */,
@@ -3112,8 +3115,11 @@ static void test_create_rendertarget_view(void)
             get_rtv_desc(current_desc, &tests[i].rtv_desc);
         }
 
+        expected_refcount = get_refcount((IUnknown *)texture);
         hr = ID3D11Device_CreateRenderTargetView(device, texture, current_desc, &rtview);
         ok(SUCCEEDED(hr), "Test %u: Failed to create render target view, hr %#x.\n", i, hr);
+        refcount = get_refcount((IUnknown *)texture);
+        ok(refcount == expected_refcount, "Got refcount %u, expected %u.\n", refcount, expected_refcount);
 
         hr = ID3D11RenderTargetView_QueryInterface(rtview, &IID_ID3D10RenderTargetView, (void **)&iface);
         ok(SUCCEEDED(hr) || broken(hr == E_NOINTERFACE) /* Not available on all Windows versions. */,
@@ -3468,8 +3474,11 @@ static void test_create_shader_resource_view(void)
             get_srv_desc(current_desc, &tests[i].srv_desc);
         }
 
+        expected_refcount = get_refcount((IUnknown *)texture);
         hr = ID3D11Device_CreateShaderResourceView(device, texture, current_desc, &srview);
         ok(SUCCEEDED(hr), "Test %u: Failed to create a shader resource view, hr %#x.\n", i, hr);
+        refcount = get_refcount((IUnknown *)texture);
+        ok(refcount == expected_refcount, "Got refcount %u, expected %u.\n", refcount, expected_refcount);
 
         hr = ID3D11ShaderResourceView_QueryInterface(srview, &IID_ID3D10ShaderResourceView, (void **)&iface);
         ok(SUCCEEDED(hr) || broken(hr == E_NOINTERFACE) /* Not available on all Windows versions. */,
@@ -4724,10 +4733,13 @@ static void test_occlusion_query(void)
     data_size = ID3D11Asynchronous_GetDataSize(query);
     ok(data_size == sizeof(data), "Got unexpected data size %u.\n", data_size);
 
+    memset(&data, 0xff, sizeof(data));
     hr = ID3D11DeviceContext_GetData(context, query, NULL, 0, 0);
-    todo_wine ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
     hr = ID3D11DeviceContext_GetData(context, query, &data, sizeof(data), 0);
-    todo_wine ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(data.dword[0] == 0xffffffff && data.dword[1] == 0xffffffff,
+            "Data was modified 0x%08x%08x.\n", data.dword[1], data.dword[0]);
 
     ID3D11DeviceContext_End(context, query);
     ID3D11DeviceContext_Begin(context, query);
@@ -4888,8 +4900,27 @@ static void test_timestamp_query(void)
     data_size = ID3D11Asynchronous_GetDataSize(timestamp_disjoint_query);
     ok(data_size == sizeof(disjoint), "Got unexpected data size %u.\n", data_size);
 
+    disjoint.Frequency = 0xdeadbeef;
+    disjoint.Disjoint = 0xdeadbeef;
+    hr = ID3D11DeviceContext_GetData(context, timestamp_disjoint_query, NULL, 0, 0);
+    ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D11DeviceContext_GetData(context, timestamp_disjoint_query, &disjoint, sizeof(disjoint), 0);
+    ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(disjoint.Frequency == 0xdeadbeef, "Frequency data was modified.\n");
+    ok(disjoint.Disjoint == 0xdeadbeef, "Disjoint data was modified.\n");
+
     /* Test a TIMESTAMP_DISJOINT query. */
     ID3D11DeviceContext_Begin(context, timestamp_disjoint_query);
+
+    disjoint.Frequency = 0xdeadbeef;
+    disjoint.Disjoint = 0xdeadbeef;
+    hr = ID3D11DeviceContext_GetData(context, timestamp_disjoint_query, NULL, 0, 0);
+    todo_wine ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    hr = ID3D11DeviceContext_GetData(context, timestamp_disjoint_query, &disjoint, sizeof(disjoint), 0);
+    todo_wine ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(disjoint.Frequency == 0xdeadbeef, "Frequency data was modified.\n");
+    ok(disjoint.Disjoint == 0xdeadbeef, "Disjoint data was modified.\n");
+
     ID3D11DeviceContext_End(context, timestamp_disjoint_query);
     for (i = 0; i < 500; ++i)
     {
@@ -4928,16 +4959,20 @@ static void test_timestamp_query(void)
     ok(hr == S_OK, "Got unexpected hr %#x.\n", hr);
     ok(!memcmp(&disjoint, &prev_disjoint, sizeof(disjoint)), "Disjoint data mismatch.\n");
 
+    memset(&timestamp, 0xff, sizeof(timestamp));
     hr = ID3D11DeviceContext_GetData(context, timestamp_query, NULL, 0, 0);
-    todo_wine ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
     hr = ID3D11DeviceContext_GetData(context, timestamp_query, &timestamp, sizeof(timestamp), 0);
-    todo_wine ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(timestamp == ~(UINT64)0, "Timestamp data was modified.\n");
 
     /* Test a TIMESTAMP query inside a TIMESTAMP_DISJOINT query. */
     ID3D11DeviceContext_Begin(context, timestamp_disjoint_query);
 
+    memset(&timestamp, 0xff, sizeof(timestamp));
     hr = ID3D11DeviceContext_GetData(context, timestamp_query, &timestamp, sizeof(timestamp), 0);
-    todo_wine ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(hr == DXGI_ERROR_INVALID_CALL, "Got unexpected hr %#x.\n", hr);
+    ok(timestamp == ~(UINT64)0, "Timestamp data was modified.\n");
 
     draw_color_quad(&test_context, &red);
 
@@ -7937,8 +7972,7 @@ static void test_resource_map(void)
 
     memset(&mapped_subresource, 0, sizeof(mapped_subresource));
     hr = ID3D11DeviceContext_Map(context, (ID3D11Resource *)texture3d, 0, D3D11_MAP_WRITE, 0, &mapped_subresource);
-    todo_wine ok(SUCCEEDED(hr), "Failed to map texture, hr %#x.\n", hr);
-    if (FAILED(hr)) goto done;
+    ok(SUCCEEDED(hr), "Failed to map texture, hr %#x.\n", hr);
     ok(mapped_subresource.RowPitch == 4 * 64, "Got unexpected row pitch %u.\n", mapped_subresource.RowPitch);
     ok(mapped_subresource.DepthPitch == 4 * 64 * 64, "Got unexpected depth pitch %u.\n",
             mapped_subresource.DepthPitch);
@@ -7955,7 +7989,6 @@ static void test_resource_map(void)
     ok(data == 0xdeadbeef, "Got unexpected data %#x.\n", data);
     ID3D11DeviceContext_Unmap(context, (ID3D11Resource *)texture3d, 0);
 
-done:
     refcount = ID3D11Texture3D_Release(texture3d);
     ok(!refcount, "3D texture has %u references left.\n", refcount);
 
@@ -8143,6 +8176,7 @@ static void test_swapchain_views(void)
     ID3D11DeviceContext *context;
     ID3D11RenderTargetView *rtv;
     ID3D11Device *device;
+    ULONG refcount;
     HRESULT hr;
 
     static const struct vec4 color = {0.2f, 0.3f, 0.5f, 1.0f};
@@ -8153,6 +8187,9 @@ static void test_swapchain_views(void)
     device = test_context.device;
     context = test_context.immediate_context;
 
+    refcount = get_refcount((IUnknown *)test_context.backbuffer);
+    ok(refcount == 1, "Got unexpected refcount %u.\n", refcount);
+
     draw_color_quad(&test_context, &color);
     check_texture_color(test_context.backbuffer, 0xff7f4c33, 1);
 
@@ -8162,6 +8199,9 @@ static void test_swapchain_views(void)
     hr = ID3D11Device_CreateRenderTargetView(device, (ID3D11Resource *)test_context.backbuffer, &rtv_desc, &rtv);
     ok(SUCCEEDED(hr), "Failed to create render target view, hr %#x.\n", hr);
     ID3D11DeviceContext_OMSetRenderTargets(context, 1, &rtv, NULL);
+
+    refcount = get_refcount((IUnknown *)test_context.backbuffer);
+    ok(refcount == 1, "Got unexpected refcount %u.\n", refcount);
 
     draw_color_quad(&test_context, &color);
     todo_wine check_texture_color(test_context.backbuffer, 0xffbc957c, 1);
@@ -10376,8 +10416,11 @@ static void test_create_unordered_access_view(void)
             get_uav_desc(current_desc, &tests[i].uav_desc);
         }
 
+        expected_refcount = get_refcount((IUnknown *)texture);
         hr = ID3D11Device_CreateUnorderedAccessView(device, texture, current_desc, &uav);
         ok(SUCCEEDED(hr), "Test %u: Failed to create unordered access view, hr %#x.\n", i, hr);
+        refcount = get_refcount((IUnknown *)texture);
+        ok(refcount == expected_refcount, "Got refcount %u, expected %u.\n", refcount, expected_refcount);
 
         memset(&uav_desc, 0, sizeof(uav_desc));
         ID3D11UnorderedAccessView_GetDesc(uav, &uav_desc);

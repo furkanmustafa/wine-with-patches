@@ -2695,8 +2695,7 @@ BOOL context_apply_clear_state(struct wined3d_context *context, const struct win
         context_check_fbo_status(context, GL_FRAMEBUFFER);
     }
 
-    if (context->last_was_blit)
-        context->last_was_blit = FALSE;
+    context->last_was_blit = FALSE;
 
     /* Blending and clearing should be orthogonal, but tests on the nvidia
      * driver show that disabling blending when clearing improves the clearing
@@ -3562,6 +3561,12 @@ BOOL context_apply_draw_state(struct wined3d_context *context,
     context->last_was_blit = FALSE;
 
     return TRUE;
+}
+
+void context_apply_compute_state(struct wined3d_context *context,
+        const struct wined3d_device *device, const struct wined3d_state *state)
+{
+    FIXME("Implement applying compute state.\n");
 }
 
 static void context_setup_target(struct wined3d_context *context,

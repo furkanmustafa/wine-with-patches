@@ -1730,10 +1730,11 @@ HRESULT CDECL wined3d_device_set_light_enable(struct wined3d_device *device, UIN
         }
         else
         {
+            unsigned int light_count = device->adapter->d3d_info.limits.active_light_count;
             unsigned int i;
-            const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
-            /* Find a free GL light. */
-            for (i = 0; i < gl_info->limits.lights; ++i)
+
+            /* Find a free light. */
+            for (i = 0; i < light_count; ++i)
             {
                 if (!device->update_state->lights[i])
                 {
@@ -3480,6 +3481,15 @@ struct wined3d_query * CDECL wined3d_device_get_predication(struct wined3d_devic
 
     *value = device->state.predicate_value;
     return device->state.predicate;
+}
+
+void CDECL wined3d_device_dispatch_compute(struct wined3d_device *device,
+        unsigned int group_count_x, unsigned int group_count_y, unsigned int group_count_z)
+{
+    TRACE("device %p, group_count_x %u, group_count_y %u, group_count_z %u.\n",
+            device, group_count_x, group_count_y, group_count_z);
+
+    wined3d_cs_emit_dispatch(device->cs, group_count_x, group_count_y, group_count_z);
 }
 
 void CDECL wined3d_device_set_primitive_type(struct wined3d_device *device,
