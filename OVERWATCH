@@ -51,3 +51,49 @@ break support for other programs. Others, such as the fake ntdll patch, will nev
 We use the 1DTextures patches from wine-staging. Its development is independent. Other wined3d patches
 from wine-staging are likely incompatible.
 
+
+4. Known Issues
+
+a) Winston's bubble and some other effects are opaque.
+
+Overwatch requires support for dual source blending. Current patch fixes this issue but also causes GPU
+to crash.
+
+b) After dying, mouse input no longer works.
+
+Cause is unknown. Workaround by ALT-TAB to another window and then ALT-TAB back.
+
+c) Graphics settings higher than Low are unsupported.
+
+
+5. Troubleshooting
+
+a) Bad or incorrect fake ntdll.dll
+
+If running Overwatch.exe crashes right after these messages:
+
+$ ./wine 'c:\program files (x86)\overwatch\overwatch.exe'
+fixme:heap:RtlSetHeapInformation 0x26e0000 0 0x23e8a0 4 stub
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:ntdll:EtwEventRegister ({5eec90ab-c022-44b2-a5dd-fd716a222a15}, 0x2dd107c, 0x2e01030, 0x2e01050) stub.
+fixme:ntdll:EtwEventSetInformation (deadbeef, 2, 0x2dfcdf0, 43) stub
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:ntdll:EtwEventRegister ({5eec90ab-c022-44b2-a5dd-fd716a222a15}, 0x27f107c, 0x2ca4030, 0x2ca4050) stub.
+fixme:ntdll:EtwEventSetInformation (deadbeef, 2, 0x2bdb578, 43) stub
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+fixme:module:load_library unsupported flag(s) used (flags: 0x00000800)
+[some error message...]
+
+Then you probably need to fix your ntdll.dll in your wine system32 directory. It is suggested that in your
+wine64 build directory you rm dlls/ntdll/ntdll.dll.fake, make, and cp it into your system32 directory.
+
+Alternatively, ./wine64 wineboot --update, may also fix the issue.
+
