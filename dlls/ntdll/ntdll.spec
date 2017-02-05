@@ -3,6 +3,7 @@
 #if you change a Nt.. function DON'T FORGET to change the
 #Zw one too.
 
+@ stdcall ApiSetQueryApiSetPresence(ptr ptr)
 @ stub CsrAllocateCaptureBuffer
 @ stub CsrAllocateCapturePointer
 @ stub CsrAllocateMessagePointer
@@ -109,7 +110,7 @@
 @ stdcall NtAlertThread(long)
 @ stdcall NtAllocateLocallyUniqueId(ptr)
 # @ stub NtAllocateUserPhysicalPages
-@ stdcall NtAllocateUuids(ptr ptr ptr)
+@ stdcall NtAllocateUuids(ptr ptr ptr ptr)
 @ stdcall NtAllocateVirtualMemory(long ptr long ptr long long)
 @ stdcall NtAreMappedFilesTheSame(ptr ptr)
 @ stdcall NtAssignProcessToJobObject(long long)
@@ -423,6 +424,7 @@
 @ stdcall RtlAddAuditAccessAceEx(ptr long long long ptr long long)
 @ stdcall RtlAddAuditAccessObjectAce(ptr long long long ptr ptr ptr long long)
 # @ stub RtlAddCompoundAce
+@ stdcall RtlAddMandatoryAce(ptr long long long long ptr)
 # @ stub RtlAddRange
 @ cdecl -arch=arm,x86_64 RtlAddFunctionTable(ptr long long)
 @ stdcall RtlAddRefActivationContext(ptr)
@@ -722,7 +724,7 @@
 @ stdcall RtlIpv4AddressToStringW(ptr ptr)
 # @ stub RtlIpv4StringToAddressA
 # @ stub RtlIpv4StringToAddressExA
-@ stdcall RtlIpv4StringToAddressExW(ptr ptr wstr ptr)
+@ stdcall RtlIpv4StringToAddressExW(wstr long ptr ptr)
 # @ stub RtlIpv4StringToAddressW
 # @ stub RtlIpv6AddressToStringA
 # @ stub RtlIpv6AddressToStringExA
@@ -730,7 +732,7 @@
 # @ stub RtlIpv6AddressToStringW
 # @ stub RtlIpv6StringToAddressA
 # @ stub RtlIpv6StringToAddressExA
-# @ stub RtlIpv6StringToAddressExW
+@ stdcall RtlIpv6StringToAddressExW(wstr ptr ptr ptr)
 # @ stub RtlIpv6StringToAddressW
 @ stdcall RtlIsActivationContextActive(ptr)
 @ stdcall RtlIsCriticalSectionLocked(ptr)
@@ -807,6 +809,7 @@
 @ stdcall RtlQueryInformationActivationContext(long long ptr long ptr long ptr)
 @ stub RtlQueryInformationActiveActivationContext
 @ stub RtlQueryInterfaceMemoryStream
+@ stdcall RtlQueryPackageIdentity(long ptr ptr ptr ptr ptr)
 @ stub RtlQueryProcessBackTraceInformation
 @ stdcall RtlQueryProcessDebugInformation(long long ptr)
 @ stub RtlQueryProcessHeapInformation
@@ -1035,7 +1038,7 @@
 @ stdcall -private ZwAlertThread(long) NtAlertThread
 @ stdcall -private ZwAllocateLocallyUniqueId(ptr) NtAllocateLocallyUniqueId
 # @ stub ZwAllocateUserPhysicalPages
-@ stdcall -private ZwAllocateUuids(ptr ptr ptr) NtAllocateUuids
+@ stdcall -private ZwAllocateUuids(ptr ptr ptr ptr) NtAllocateUuids
 @ stdcall -private ZwAllocateVirtualMemory(long ptr long ptr long long) NtAllocateVirtualMemory
 @ stdcall -private ZwAreMappedFilesTheSame(ptr ptr) NtAreMappedFilesTheSame
 @ stdcall -private ZwAssignProcessToJobObject(long long) NtAssignProcessToJobObject
@@ -1331,7 +1334,7 @@
 @ cdecl -private __iscsymf(long) NTDLL___iscsymf
 @ cdecl -private __toascii(long) NTDLL___toascii
 @ stdcall -private -arch=i386 -ret64 _alldiv(int64 int64)
-# @ stub _alldvrm
+@ stdcall -private -arch=i386 -norelay _alldvrm(int64 int64)
 @ stdcall -private -arch=i386 -ret64 _allmul(int64 int64)
 @ stdcall -private -arch=i386 -norelay _alloca_probe()
 @ stdcall -private -arch=i386 -ret64 _allrem(int64 int64)
@@ -1339,7 +1342,7 @@
 @ stdcall -private -arch=i386 -ret64 _allshr(int64 long)
 @ cdecl -private -ret64 _atoi64(str)
 @ stdcall -private -arch=i386 -ret64 _aulldiv(int64 int64)
-# @ stub _aulldvrm
+@ stdcall -private -arch=i386 -norelay _aulldvrm(int64 int64)
 @ stdcall -private -arch=i386 -ret64 _aullrem(int64 int64)
 @ stdcall -private -arch=i386 -ret64 _aullshr(int64 long)
 @ stdcall -private -arch=i386 -norelay _chkstk()
@@ -1471,6 +1474,7 @@
 
 # Server interface
 @ cdecl -norelay wine_server_call(ptr)
+@ cdecl wine_server_close_fds_by_type(long)
 @ cdecl wine_server_fd_to_handle(long long long ptr)
 @ cdecl wine_server_handle_to_fd(long long ptr ptr)
 @ cdecl wine_server_release_fd(long long)
@@ -1479,6 +1483,7 @@
 
 # Version
 @ cdecl wine_get_version() NTDLL_wine_get_version
+@ cdecl wine_get_patches() NTDLL_wine_get_patches
 @ cdecl wine_get_build_id() NTDLL_wine_get_build_id
 @ cdecl wine_get_host_version(ptr ptr) NTDLL_wine_get_host_version
 
@@ -1488,7 +1493,14 @@
 # signal handling
 @ cdecl __wine_set_signal_handler(long ptr)
 
+# Virtual memory management
+@ cdecl wine_uninterrupted_read_memory(ptr ptr long)
+@ cdecl wine_uninterrupted_write_memory(ptr ptr long)
+
 # Filesystem
 @ cdecl wine_nt_to_unix_file_name(ptr ptr long long)
 @ cdecl wine_unix_to_nt_file_name(ptr ptr)
 @ cdecl __wine_init_windows_dir(wstr wstr)
+
+# User shared data
+@ cdecl __wine_user_shared_data()

@@ -20,7 +20,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 %}
-%option noinput nounput noyywrap never-interactive 8bit
+%option noinput nounput never-interactive 8bit noyywrap
 %x quote
 %{
 #include "config.h"
