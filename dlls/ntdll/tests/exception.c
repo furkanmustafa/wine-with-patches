@@ -2295,42 +2295,36 @@ static void test_prot_fault(void)
     }
 }
 
-static DWORD dr7_handler( EXCEPTION_RECORD *rec, EXCEPTION_REGISTRATION_RECORD *frame,
-                      CONTEXT *context, EXCEPTION_REGISTRATION_RECORD **dispatcher )
+static DWORD WINAPI dr7_handler( EXCEPTION_RECORD *rec, ULONG64 frame,
+                      CONTEXT *context, DISPATCHER_CONTEXT *dispatcher )
 {
-    ok( (context->Dr7 & 0xff) == 0,
-        "bad dr7 value %lx\n", context->Dr7 );
+    BOOL todo = context->Dr7 == 0;
+    ULONG_PTR dr7 = **(ULONG_PTR **)(dispatcher->HandlerData);
+
+    if (rec->ExceptionCode != STATUS_BREAKPOINT)
+        return ExceptionContinueSearch;
+
+    todo_wine_if(todo)
+    ok( (context->Dr7 & ~0xdc00) == dr7,
+        "expected %lx, dr7 %lx\n", dr7, context->Dr7 );
+    trace( "dr0 %lx, dr1 %lx, dr2 %lx\n", context->Dr0, context->Dr1, context->Dr2 );
+    trace( "dr3 %lx, dr6 %lx, dr7 %lx\n", context->Dr3, context->Dr6, context->Dr7 );
 
     context->Rip += 1;
     return ExceptionContinueExecution;
 }
 
-static void test_dr7(void)
-{
-    struct {
-        EXCEPTION_REGISTRATION_RECORD frame;
-        const void *context;
-    } exc_frame;
-
-    exc_frame.frame.Handler = dr7_handler;
-    exc_frame.frame.Prev = NtCurrentTeb()->Tib.ExceptionList;
-    exc_frame.context = NULL;
-
-    /* fill memory above the red zone with 0xFF */
-    asm volatile (
-        "mov $4096, %%rcx\n\t"
-        "lea -128-4096(%%rsp), %%rdi\n\t"
-        "mov $0xFF, %%rax\n\t"
-        "rep stosb\n\t"
-        : : : "rax", "rcx", "rdi"
-    );
-
-    NtCurrentTeb()->Tib.ExceptionList = &exc_frame.frame;
-    asm volatile (
-        "int3\n\t"
-    );
-    NtCurrentTeb()->Tib.ExceptionList = exc_frame.frame.Prev;
-}
+/* Fill stack area above red zone with 0xff, then trigger exception. */
+static const BYTE dr7_test_code[] = {
+        0x57,                                           /* push %rdi */
+        0x48, 0xc7, 0xc1, 0x00, 0x10, 0x00, 0x00,       /* mov $0x1000, %rcx */
+        0x48, 0x8d, 0xbc, 0x24, 0x80, 0xef, 0xff, 0xff, /* lea -0x1080(%rsp), %rdi */
+        0x48, 0xc7, 0xc0, 0xff, 0x00, 0x00, 0x00,       /* mov $0xff, %rax */
+        0xf3, 0xaa,                                     /* rep stosb */
+        0xcc,                                           /* int3 */
+        0x5f,                                           /* pop %rdi */
+        0xc3,                                           /* ret */
+};
 
 #endif  /* __x86_64__ */
 
@@ -2376,6 +2370,10 @@ static void test_debug_registers(void)
         ok(ctx.Dr3 == tests[i].dr3, "test %d: expected %lx, got %lx\n", i, tests[i].dr3, (DWORD_PTR)ctx.Dr3);
         ok((ctx.Dr6 &  0xf00f) == tests[i].dr6, "test %d: expected %lx, got %lx\n", i, tests[i].dr6, (DWORD_PTR)ctx.Dr6);
         ok((ctx.Dr7 & ~0xdc00) == tests[i].dr7, "test %d: expected %lx, got %lx\n", i, tests[i].dr7, (DWORD_PTR)ctx.Dr7);
+
+#if defined(__x86_64__)
+        run_exception_test(dr7_handler, &tests[i].dr7, dr7_test_code, sizeof(dr7_test_code), 0);
+#endif
     }
 }
 
@@ -2865,7 +2863,6 @@ START_TEST(exception)
                                                                  "RtlUnwindEx" );
     p_setjmp                           = (void *)GetProcAddress( hmsvcrt,
                                                                  "_setjmp" );
-
     test_debug_registers();
     test_outputdebugstring(1, FALSE);
     test_ripevent(1);
@@ -2876,7 +2873,6 @@ START_TEST(exception)
     test___C_specific_handler();
     test_restore_context();
     test_prot_fault();
-    test_dr7();
 
     if (pRtlAddFunctionTable && pRtlDeleteFunctionTable && pRtlInstallFunctionTableCallback && pRtlLookupFunctionEntry)
       test_dynamic_unwind();
