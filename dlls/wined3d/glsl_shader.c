@@ -2311,7 +2311,7 @@ static void shader_generate_glsl_declarations(const struct wined3d_context *cont
                     declare_in_varying(gl_info, buffer, shader->u.ps.interpolation_mode[j] == WINED3DSIM_CONSTANT,
                             "vec4 %s_link%u;\n", prefix, j);
                     if (shader->u.ps.interpolation_mode[j] > WINED3DSIM_LINEAR)
-                        FIXME("Unhandled interpolation mode %s_link%u.\n", prefix, j,
+                        FIXME("Unhandled interpolation mode %s_link%u (%u).\n", prefix, j,
                                 shader->u.ps.interpolation_mode[j]);
                 }
             }
