@@ -884,7 +884,6 @@ static HRESULT shader_get_registers_used(struct wined3d_shader *shader, const st
     memset(output_signature_elements, 0, sizeof(output_signature_elements));
     reg_maps->min_rel_offset = ~0U;
     list_init(&reg_maps->indexable_temps);
-    memset(shader->u.ps.interpolation_mode, 0, sizeof(shader->u.ps.interpolation_mode));
 
     fe->shader_read_header(fe_data, &ptr, &shader_version);
     reg_maps->shader_version = shader_version;
@@ -981,8 +980,11 @@ static HRESULT shader_get_registers_used(struct wined3d_shader *shader, const st
         {
             unsigned int reg_idx = ins.declaration.dst.reg.idx[0].offset;
             reg_maps->input_registers |= 1u << reg_idx;
-            /* We can assume we are in the pixel shader */
-            shader->u.ps.interpolation_mode[reg_idx] = ins.flags;
+            if (shader_version.type == WINED3D_SHADER_TYPE_PIXEL)
+                shader->u.ps.interpolation_mode[reg_idx] = ins.flags;
+            else
+                FIXME("Invalid instruction %#x for shader type %#x.\n",
+                        ins.handler_idx, shader_version.type);
         }
         else if (ins.handler_idx == WINED3DSIH_DCL_CONSTANT_BUFFER)
         {
