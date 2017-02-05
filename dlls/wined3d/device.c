@@ -624,6 +624,17 @@ static void create_dummy_textures(struct wined3d_device *device, struct wined3d_
      * to each texture stage when the currently set D3D texture is NULL. */
     context_active_texture(context, gl_info, 0);
 
+    gl_info->gl_ops.gl.p_glGenTextures(1, &device->dummy_textures.tex_1d);
+    checkGLcall("glGenTextures");
+    TRACE("Dummy 1D texture given name %u.\n", device->dummy_textures.tex_1d);
+
+    gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_1D, device->dummy_textures.tex_1d);
+    checkGLcall("glBindTexture");
+
+    gl_info->gl_ops.gl.p_glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA8, 1, 0,
+            GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, &color);
+    checkGLcall("glTexImage1D");
+
     gl_info->gl_ops.gl.p_glGenTextures(1, &device->dummy_textures.tex_2d);
     checkGLcall("glGenTextures");
     TRACE("Dummy 2D texture given name %u.\n", device->dummy_textures.tex_2d);
@@ -682,6 +693,17 @@ static void create_dummy_textures(struct wined3d_device *device, struct wined3d_
 
     if (gl_info->supported[EXT_TEXTURE_ARRAY])
     {
+        gl_info->gl_ops.gl.p_glGenTextures(1, &device->dummy_textures.tex_1d_array);
+        checkGLcall("glGenTextures");
+        TRACE("Dummy 1D array texture given name %u.\n", device->dummy_textures.tex_1d_array);
+
+        gl_info->gl_ops.gl.p_glBindTexture(GL_TEXTURE_1D_ARRAY, device->dummy_textures.tex_1d_array);
+        checkGLcall("glBindTexture");
+
+        gl_info->gl_ops.gl.p_glTexImage2D(GL_TEXTURE_1D_ARRAY, 0, GL_RGBA8, 1, 1, 0,
+                GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, &color);
+        checkGLcall("glTexImage2D");
+
         gl_info->gl_ops.gl.p_glGenTextures(1, &device->dummy_textures.tex_2d_array);
         checkGLcall("glGenTextures");
         TRACE("Dummy 2D array texture given name %u.\n", device->dummy_textures.tex_2d_array);
@@ -729,7 +751,10 @@ static void destroy_dummy_textures(struct wined3d_device *device, struct wined3d
         gl_info->gl_ops.gl.p_glDeleteTextures(1, &device->dummy_textures.tex_buffer);
 
     if (gl_info->supported[EXT_TEXTURE_ARRAY])
+    {
         gl_info->gl_ops.gl.p_glDeleteTextures(1, &device->dummy_textures.tex_2d_array);
+        gl_info->gl_ops.gl.p_glDeleteTextures(1, &device->dummy_textures.tex_1d_array);
+    }
 
     if (gl_info->supported[ARB_TEXTURE_CUBE_MAP])
         gl_info->gl_ops.gl.p_glDeleteTextures(1, &device->dummy_textures.tex_cube);
@@ -741,6 +766,7 @@ static void destroy_dummy_textures(struct wined3d_device *device, struct wined3d
         gl_info->gl_ops.gl.p_glDeleteTextures(1, &device->dummy_textures.tex_rect);
 
     gl_info->gl_ops.gl.p_glDeleteTextures(1, &device->dummy_textures.tex_2d);
+    gl_info->gl_ops.gl.p_glDeleteTextures(1, &device->dummy_textures.tex_1d);
 
     checkGLcall("Delete dummy textures");
 
@@ -1223,7 +1249,30 @@ void CDECL wined3d_device_set_multithreaded(struct wined3d_device *device)
 
 UINT CDECL wined3d_device_get_available_texture_mem(const struct wined3d_device *device)
 {
+    const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
+
     TRACE("device %p.\n", device);
+
+    /* We can not acquire the context unless there is a swapchain. */
+    if (device->swapchains && gl_info->supported[NVX_GPU_MEMORY_INFO] &&
+            !wined3d_settings.emulated_textureram)
+    {
+        GLint vram_free_kb;
+        UINT64 vram_free;
+
+        struct wined3d_context *context = context_acquire(device, NULL);
+        gl_info->gl_ops.gl.p_glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &vram_free_kb);
+        vram_free = (UINT64)vram_free_kb * 1024;
+        context_release(context);
+
+        TRACE("Total 0x%s bytes. emulation 0x%s left, driver 0x%s left.\n",
+                wine_dbgstr_longlong(device->adapter->vram_bytes),
+                wine_dbgstr_longlong(device->adapter->vram_bytes - device->adapter->vram_bytes_used),
+                wine_dbgstr_longlong(vram_free));
+
+        vram_free = min(vram_free, device->adapter->vram_bytes - device->adapter->vram_bytes_used);
+        return min(UINT_MAX, vram_free);
+    }
 
     TRACE("Emulating 0x%s bytes. 0x%s used, returning 0x%s left.\n",
             wine_dbgstr_longlong(device->adapter->vram_bytes),
@@ -3309,6 +3358,82 @@ struct wined3d_texture * CDECL wined3d_device_get_texture(const struct wined3d_d
     return device->state.textures[stage];
 }
 
+void CDECL wined3d_check_device_format_support(struct wined3d_device *device,
+        enum wined3d_format_id check_format_id, UINT *support)
+{
+    const struct wined3d_format *format = wined3d_get_format(&device->adapter->gl_info, check_format_id, 0);
+    const struct wined3d_gl_info *gl_info = &device->adapter->gl_info;
+
+    UINT support_flags = 0;
+
+    if (format->flags[WINED3D_GL_RES_TYPE_BUFFER] & WINED3DFMT_FLAG_TEXTURE)
+    {
+        support_flags |= WINED3D_FORMAT_SUPPORT_BUFFER;
+        support_flags |= WINED3D_FORMAT_SUPPORT_IA_VERTEX_BUFFER;
+        support_flags |= WINED3D_FORMAT_SUPPORT_IA_INDEX_BUFFER;
+        support_flags |= WINED3D_FORMAT_SUPPORT_SO_BUFFER;
+    }
+
+    if (format->flags[WINED3D_GL_RES_TYPE_TEX_1D] & WINED3DFMT_FLAG_TEXTURE)
+        support_flags |= WINED3D_FORMAT_SUPPORT_TEXTURE1D;
+
+    if (format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_TEXTURE)
+    {
+        support_flags |= WINED3D_FORMAT_SUPPORT_TEXTURE2D;
+
+        if (gl_info->supported[EXT_TEXTURE_ARRAY])
+            support_flags |= WINED3D_FORMAT_SUPPORT_TEXTURECUBE;
+
+        /* OpenGL requires that all officially supported formats support mip mapping */
+        support_flags |= WINED3D_FORMAT_SUPPORT_MIP;
+
+        if (support_flags & gl_info->supported[SGIS_GENERATE_MIPMAP])
+            support_flags |= WINED3D_FORMAT_SUPPORT_MIP_AUTOGEN;
+
+        /* For the following flags it should be sufficient to check only 2d textures  */
+        if (format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_RENDERTARGET)
+            support_flags |= WINED3D_FORMAT_SUPPORT_RENDER_TARGET;
+
+        if (format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_POSTPIXELSHADER_BLENDING)
+            support_flags |= WINED3D_FORMAT_SUPPORT_BLENDABLE;
+
+        if ((format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_DEPTH) &&
+            (format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_STENCIL))
+            support_flags |= WINED3D_FORMAT_SUPPORT_DEPTH_STENCIL;
+
+        if (format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_POSTPIXELSHADER_BLENDING)
+            support_flags |= WINED3D_FORMAT_SUPPORT_BLENDABLE;
+
+        /* not sure how to test the following flags - assuming yes */
+        support_flags |= WINED3D_FORMAT_SUPPORT_SHADER_LOAD;
+        support_flags |= WINED3D_FORMAT_SUPPORT_SHADER_SAMPLE;
+        support_flags |= WINED3D_FORMAT_SUPPORT_SHADER_SAMPLE_COMPARISON;
+        support_flags |= WINED3D_FORMAT_SUPPORT_SHADER_GATHER;
+        support_flags |= WINED3D_FORMAT_SUPPORT_SHADER_GATHER_COMPARISON;
+
+        support_flags |= WINED3D_FORMAT_SUPPORT_CPU_LOCKABLE;
+        support_flags |= WINED3D_FORMAT_SUPPORT_DISPLAY;
+        support_flags |= WINED3D_FORMAT_SUPPORT_BACK_BUFFER_CAST;
+        support_flags |= WINED3D_FORMAT_SUPPORT_TYPED_UNORDERED_ACCESS_VIEW;
+        support_flags |= WINED3D_FORMAT_SUPPORT_SHADER_GATHER_COMPARISON;
+    }
+
+    if (format->flags[WINED3D_GL_RES_TYPE_TEX_3D] & WINED3DFMT_FLAG_TEXTURE)
+        support_flags |= WINED3D_FORMAT_SUPPORT_TEXTURE3D;
+
+    if (gl_info->supported[ARB_MULTISAMPLE])
+    {
+        /* TODO: check if multisampling for this format is supported */
+        support_flags |= WINED3D_FORMAT_SUPPORT_MULTISAMPLE_LOAD;
+        support_flags |= WINED3D_FORMAT_SUPPORT_MULTISAMPLE_RESOLVE;
+
+        if (support_flags & WINED3D_FORMAT_SUPPORT_RENDER_TARGET)
+            support_flags |= WINED3D_FORMAT_SUPPORT_MULTISAMPLE_RENDERTARGET;
+    }
+
+    *support = support_flags;
+}
+
 HRESULT CDECL wined3d_device_get_device_caps(const struct wined3d_device *device, WINED3DCAPS *caps)
 {
     TRACE("device %p, caps %p.\n", device, caps);
@@ -4089,7 +4214,8 @@ void CDECL wined3d_device_update_sub_resource(struct wined3d_device *device, str
         return;
     }
 
-    if (resource->type != WINED3D_RTYPE_TEXTURE_2D && resource->type != WINED3D_RTYPE_TEXTURE_3D)
+    if (resource->type != WINED3D_RTYPE_TEXTURE_1D &&
+        resource->type != WINED3D_RTYPE_TEXTURE_2D && resource->type != WINED3D_RTYPE_TEXTURE_3D)
     {
         FIXME("Not implemented for %s resources.\n", debug_d3dresourcetype(resource->type));
         return;
@@ -4939,6 +5065,7 @@ void device_resource_released(struct wined3d_device *device, struct wined3d_reso
 
     switch (type)
     {
+        case WINED3D_RTYPE_TEXTURE_1D:
         case WINED3D_RTYPE_TEXTURE_2D:
         case WINED3D_RTYPE_TEXTURE_3D:
             for (i = 0; i < MAX_COMBINED_SAMPLERS; ++i)

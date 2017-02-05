@@ -29,6 +29,7 @@
 #include "winbase.h"
 #include "winreg.h"
 #include "winternl.h"
+#include "sddl.h"
 #include "advapi32_misc.h"
 
 #include "wine/debug.h"
@@ -404,14 +405,18 @@ NTSTATUS WINAPI LsaLookupNames2( LSA_HANDLE policy, ULONG flags, ULONG count,
     sid = (SID *)(*sids + count);
 
     /* use maximum domain count */
-    if (!(*domains = heap_alloc(sizeof(LSA_REFERENCED_DOMAIN_LIST) + sizeof(LSA_TRUST_INFORMATION)*count +
-                                sid_size_total + domainname_size_total*sizeof(WCHAR))))
+    if (!(*domains = heap_alloc(sizeof(LSA_REFERENCED_DOMAIN_LIST) + sizeof(LSA_TRUST_INFORMATION) * (count + 1) +
+                                sid_size_total + domainname_size_total * sizeof(WCHAR))))
     {
         heap_free(*sids);
         return STATUS_NO_MEMORY;
     }
     (*domains)->Entries = 0;
-    (*domains)->Domains = (LSA_TRUST_INFORMATION*)((char*)*domains + sizeof(LSA_REFERENCED_DOMAIN_LIST));
+    (*domains)->Domains = (LSA_TRUST_INFORMATION*)((char*)*domains +
+                          sizeof(LSA_REFERENCED_DOMAIN_LIST) + sizeof(LSA_TRUST_INFORMATION));
+    (*domains)->Domains[-1].Sid = NULL;
+    RtlInitUnicodeStringEx(&(*domains)->Domains[-1].Name, NULL);
+
     domain_data = (char*)(*domains)->Domains + sizeof(LSA_TRUST_INFORMATION)*count;
 
     domain.Buffer = heap_alloc(domain_size_max*sizeof(WCHAR));
@@ -488,21 +493,24 @@ NTSTATUS WINAPI LsaLookupSids(
     if (!(*Names = heap_alloc(name_fullsize))) return STATUS_NO_MEMORY;
     /* maximum count of stored domain infos is Count, allocate it like that cause really needed
        count could only be computed after sid data is retrieved */
-    domain_fullsize = sizeof(LSA_REFERENCED_DOMAIN_LIST) + sizeof(LSA_TRUST_INFORMATION)*Count;
+    domain_fullsize = sizeof(LSA_REFERENCED_DOMAIN_LIST) + sizeof(LSA_TRUST_INFORMATION) * (Count + 1);
     if (!(*ReferencedDomains = heap_alloc(domain_fullsize)))
     {
         heap_free(*Names);
         return STATUS_NO_MEMORY;
     }
     (*ReferencedDomains)->Entries = 0;
-    (*ReferencedDomains)->Domains = (LSA_TRUST_INFORMATION*)((char*)*ReferencedDomains + sizeof(LSA_REFERENCED_DOMAIN_LIST));
+    (*ReferencedDomains)->Domains = (LSA_TRUST_INFORMATION*)((char*)*ReferencedDomains +
+                                    sizeof(LSA_REFERENCED_DOMAIN_LIST) + sizeof(LSA_TRUST_INFORMATION));
+    (*ReferencedDomains)->Domains[-1].Sid = NULL;
+    RtlInitUnicodeStringEx(&(*ReferencedDomains)->Domains[-1].Name, NULL);
 
     /* Get full names data length and full length needed to store domain name and SID */
     for (i = 0; i < Count; i++)
     {
         (*Names)[i].Use = SidTypeUnknown;
         (*Names)[i].DomainIndex = -1;
-        (*Names)[i].Name.Buffer = NULL;
+        RtlInitUnicodeStringEx(&(*Names)[i].Name, NULL);
 
         memset(&(*ReferencedDomains)->Domains[i], 0, sizeof(LSA_TRUST_INFORMATION));
 
@@ -547,6 +555,21 @@ NTSTATUS WINAPI LsaLookupSids(
                 heap_free(name);
             }
         }
+        else
+        {
+            WCHAR *strsid = NULL;
+
+            if (ConvertSidToStringSidW(Sids[i], &strsid))
+            {
+                name_size = strlenW(strsid) + 1;
+
+                (*Names)[i].Name.Length = (name_size - 1) * sizeof(WCHAR);
+                (*Names)[i].Name.MaximumLength = name_size * sizeof(WCHAR);
+                name_fullsize += (*Names)[i].Name.MaximumLength;
+
+                LocalFree(strsid);
+            }
+        }
     }
 
     /* now we have full length needed for both */
@@ -555,7 +578,8 @@ NTSTATUS WINAPI LsaLookupSids(
 
     *ReferencedDomains = heap_realloc(*ReferencedDomains, domain_fullsize);
     /* fix pointer after reallocation */
-    (*ReferencedDomains)->Domains = (LSA_TRUST_INFORMATION*)((char*)*ReferencedDomains + sizeof(LSA_REFERENCED_DOMAIN_LIST));
+    (*ReferencedDomains)->Domains = (LSA_TRUST_INFORMATION*)((char*)*ReferencedDomains +
+                                    sizeof(LSA_REFERENCED_DOMAIN_LIST) + sizeof(LSA_TRUST_INFORMATION));
     domain_data = (char*)(*ReferencedDomains)->Domains + sizeof(LSA_TRUST_INFORMATION)*Count;
 
     mapped = 0;
@@ -583,6 +607,21 @@ NTSTATUS WINAPI LsaLookupSids(
             {
                 (*Names)[i].DomainIndex = lsa_reflist_add_domain(*ReferencedDomains, &domain, &domain_data);
                 heap_free(domain.Buffer);
+            }
+        }
+        else
+        {
+            WCHAR *strsid = NULL;
+
+            if (ConvertSidToStringSidW(Sids[i], &strsid))
+            {
+                name_size = strlenW(strsid) + 1;
+                mapped++;
+
+                (*Names)[i].Name.Buffer = name_buffer;
+                memcpy((*Names)[i].Name.Buffer, strsid, name_size * sizeof(WCHAR));
+
+                LocalFree(strsid);
             }
         }
 

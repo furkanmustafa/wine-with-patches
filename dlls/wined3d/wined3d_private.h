@@ -1978,6 +1978,7 @@ enum wined3d_pci_device
     CARD_NVIDIA_GEFORCE_GTX550      = 0x1244,
     CARD_NVIDIA_GEFORCE_GT555M      = 0x04b8,
     CARD_NVIDIA_GEFORCE_GTX560TI    = 0x1200,
+    CARD_NVIDIA_GEFORCE_GTX560M     = 0x1251,
     CARD_NVIDIA_GEFORCE_GTX560      = 0x1201,
     CARD_NVIDIA_GEFORCE_GTX570      = 0x1081,
     CARD_NVIDIA_GEFORCE_GTX580      = 0x1080,
@@ -2587,10 +2588,12 @@ struct wined3d_device
     /* Textures for when no other textures are mapped */
     struct
     {
+        GLuint tex_1d;
         GLuint tex_2d;
         GLuint tex_rect;
         GLuint tex_3d;
         GLuint tex_cube;
+        GLuint tex_1d_array;
         GLuint tex_2d_array;
         GLuint tex_buffer;
     } dummy_textures;
@@ -2639,6 +2642,8 @@ struct wined3d_resource_ops
     void (*resource_unload)(struct wined3d_resource *resource);
     HRESULT (*resource_sub_resource_map)(struct wined3d_resource *resource, unsigned int sub_resource_idx,
             struct wined3d_map_desc *map_desc, const struct wined3d_box *box, DWORD flags);
+    HRESULT (*resource_map_info)(struct wined3d_resource *resource, unsigned int sub_resource_idx,
+            struct wined3d_map_info *info, DWORD flags);
     HRESULT (*resource_sub_resource_unmap)(struct wined3d_resource *resource, unsigned int sub_resource_idx);
 };
 
@@ -3873,6 +3878,9 @@ static inline struct wined3d_surface *context_get_rt_surface(const struct wined3
         return NULL;
     return texture->sub_resources[context->current_rt.sub_resource_idx].u.surface;
 }
+
+BOOL wined3d_dxtn_init(void) DECLSPEC_HIDDEN;
+void wined3d_dxtn_free(void) DECLSPEC_HIDDEN;
 
 /* The WNDCLASS-Name for the fake window which we use to retrieve the GL capabilities */
 #define WINED3D_OPENGL_WINDOW_CLASS_NAME "WineD3D_OpenGL"
