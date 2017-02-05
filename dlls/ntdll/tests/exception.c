@@ -2153,15 +2153,15 @@ static const struct exception
 
 static int got_exception;
 
-static void run_exception_test(void *handler, const void* context,
+static DWORD run_exception_test(void *handler, const void* context,
                                const void *code, unsigned int code_size,
                                DWORD access)
 {
     unsigned char buf[8 + 6 + 8 + 8];
     RUNTIME_FUNCTION runtime_func;
     UNWIND_INFO *unwind = (UNWIND_INFO *)buf;
-    void (*func)(void) = code_mem;
-    DWORD oldaccess, oldaccess2;
+    DWORD (*func)(void) = code_mem;
+    DWORD oldaccess, oldaccess2, result;
 
     runtime_func.BeginAddress = 0;
     runtime_func.EndAddress = code_size;
@@ -2187,11 +2187,13 @@ static void run_exception_test(void *handler, const void* context,
         VirtualProtect(code_mem, code_size, access, &oldaccess);
 
     pRtlAddFunctionTable(&runtime_func, 1, (ULONG_PTR)code_mem);
-    func();
+    result = func();
     pRtlDeleteFunctionTable(&runtime_func);
 
     if(access)
         VirtualProtect(code_mem, code_size, oldaccess, &oldaccess2);
+
+    return result;
 }
 
 static DWORD WINAPI handler( EXCEPTION_RECORD *rec, ULONG64 frame,
@@ -2293,6 +2295,47 @@ static void test_prot_fault(void)
         ok( got_exception == (exceptions[i].status != 0),
             "%u: bad exception count %d\n", i, got_exception );
     }
+}
+
+static DWORD WINAPI unwind_rdi_rsi_handler( EXCEPTION_RECORD *rec, ULONG64 frame,
+                      CONTEXT *context, DISPATCHER_CONTEXT *dispatcher )
+{
+    if (rec->ExceptionCode != STATUS_BREAKPOINT)
+        return ExceptionContinueSearch;
+
+    RtlUnwind( (PVOID)context->Rsp, (PVOID)(context->Rip + 1), rec, NULL );
+    return ExceptionContinueSearch;
+}
+
+static const BYTE unwind_rdi_test_code[] = {
+        0x57,                                           /* push %rdi */
+        0x48, 0xc7, 0xc7, 0x55, 0x55, 0x55, 0x55,       /* mov $0x55555555, %rdi */
+        0xcc,                                           /* int3 */
+        0x48, 0x89, 0xf8,                               /* mov %rdi, %rax */
+        0x5f,                                           /* pop %rdi */
+        0xc3,                                           /* ret */
+};
+
+static const BYTE unwind_rsi_test_code[] = {
+        0x56,                                           /* push %rsi */
+        0x48, 0xc7, 0xc6, 0x33, 0x33, 0x33, 0x33,       /* mov $0x33333333, %rsi */
+        0xcc,                                           /* int3 */
+        0x48, 0x89, 0xf0,                               /* mov %rsi, %rax */
+        0x5e,                                           /* pop %rsi */
+        0xc3,                                           /* ret */
+};
+
+static void test_unwind_rdi_rsi(void)
+{
+    DWORD result;
+
+    result = run_exception_test(unwind_rdi_rsi_handler, NULL, unwind_rdi_test_code,
+            sizeof(unwind_rdi_test_code), 0);
+    ok( result == 0x55555555, "expected %x, got %x\n", 0x55555555, result );
+
+    result = run_exception_test(unwind_rdi_rsi_handler, NULL, unwind_rsi_test_code,
+            sizeof(unwind_rsi_test_code), 0);
+    ok( result == 0x33333333, "expected %x, got %x\n", 0x33333333, result );
 }
 
 static DWORD WINAPI dr7_handler( EXCEPTION_RECORD *rec, ULONG64 frame,
@@ -2873,6 +2916,7 @@ START_TEST(exception)
     test___C_specific_handler();
     test_restore_context();
     test_prot_fault();
+    test_unwind_rdi_rsi();
 
     if (pRtlAddFunctionTable && pRtlDeleteFunctionTable && pRtlInstallFunctionTableCallback && pRtlLookupFunctionEntry)
       test_dynamic_unwind();
