@@ -2338,27 +2338,41 @@ static void test_unwind_rdi_rsi(void)
     ok( result == 0x33333333, "expected %x, got %x\n", 0x33333333, result );
 }
 
-static DWORD WINAPI dr7_handler( EXCEPTION_RECORD *rec, ULONG64 frame,
-                      CONTEXT *context, DISPATCHER_CONTEXT *dispatcher )
+#endif  /* __x86_64__ */
+
+#if defined(__i386__) || defined(__x86_64__)
+static const struct
 {
-    BOOL todo = context->Dr7 == 0;
-    ULONG_PTR dr7 = **(ULONG_PTR **)(dispatcher->HandlerData);
+    ULONG_PTR dr0, dr1, dr2, dr3, dr6, dr7;
+}
+debug_register_tests[] =
+{
+    { 0x42424240, 0, 0x126bb070, 0x0badbad0, 0, 0xffff0115 },
+    { 0x42424242, 0, 0x100f0fe7, 0x0abebabe, 0, 0x115 },
+};
+
+#if defined(__x86_64__)
+static DWORD WINAPI debug_register_handler( EXCEPTION_RECORD *rec, ULONG64 frame,
+                      CONTEXT *ctx, DISPATCHER_CONTEXT *dispatcher )
+{
+    int i = **(int **)(dispatcher->HandlerData);
 
     if (rec->ExceptionCode != STATUS_BREAKPOINT)
         return ExceptionContinueSearch;
 
-    todo_wine_if(todo)
-    ok( (context->Dr7 & ~0xdc00) == dr7,
-        "expected %lx, dr7 %lx\n", dr7, context->Dr7 );
-    trace( "dr0 %lx, dr1 %lx, dr2 %lx\n", context->Dr0, context->Dr1, context->Dr2 );
-    trace( "dr3 %lx, dr6 %lx, dr7 %lx\n", context->Dr3, context->Dr6, context->Dr7 );
+    ok(ctx->Dr0 == debug_register_tests[i].dr0, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr0, ctx->Dr0);
+    ok(ctx->Dr1 == debug_register_tests[i].dr1, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr1, ctx->Dr1);
+    ok(ctx->Dr2 == debug_register_tests[i].dr2, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr2, ctx->Dr2);
+    ok(ctx->Dr3 == debug_register_tests[i].dr3, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr3, ctx->Dr3);
+    ok((ctx->Dr6 &  0xf00f) == debug_register_tests[i].dr6, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr6, ctx->Dr6);
+    ok((ctx->Dr7 & ~0xdc00) == debug_register_tests[i].dr7, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr7, ctx->Dr7);
 
-    context->Rip += 1;
+    ctx->Rip += 1;
     return ExceptionContinueExecution;
 }
 
 /* Fill stack area above red zone with 0xff, then trigger exception. */
-static const BYTE dr7_test_code[] = {
+static const BYTE debug_register_test_code[] = {
         0x57,                                           /* push %rdi */
         0x48, 0xc7, 0xc1, 0x00, 0x10, 0x00, 0x00,       /* mov $0x1000, %rcx */
         0x48, 0x8d, 0xbc, 0x24, 0x80, 0xef, 0xff, 0xff, /* lea -0x1080(%rsp), %rdi */
@@ -2368,36 +2382,24 @@ static const BYTE dr7_test_code[] = {
         0x5f,                                           /* pop %rdi */
         0xc3,                                           /* ret */
 };
-
-#endif  /* __x86_64__ */
-
-#if defined(__i386__) || defined(__x86_64__)
+#endif
 
 static void test_debug_registers(void)
 {
-    static const struct
-    {
-        ULONG_PTR dr0, dr1, dr2, dr3, dr6, dr7;
-    }
-    tests[] =
-    {
-        { 0x42424240, 0, 0x126bb070, 0x0badbad0, 0, 0xffff0115 },
-        { 0x42424242, 0, 0x100f0fe7, 0x0abebabe, 0, 0x115 },
-    };
     NTSTATUS status;
     CONTEXT ctx;
     int i;
 
-    for (i = 0; i < sizeof(tests)/sizeof(tests[0]); i++)
+    for (i = 0; i < sizeof(debug_register_tests)/sizeof(debug_register_tests[0]); i++)
     {
         memset(&ctx, 0, sizeof(ctx));
         ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-        ctx.Dr0 = tests[i].dr0;
-        ctx.Dr1 = tests[i].dr1;
-        ctx.Dr2 = tests[i].dr2;
-        ctx.Dr3 = tests[i].dr3;
-        ctx.Dr6 = tests[i].dr6;
-        ctx.Dr7 = tests[i].dr7;
+        ctx.Dr0 = debug_register_tests[i].dr0;
+        ctx.Dr1 = debug_register_tests[i].dr1;
+        ctx.Dr2 = debug_register_tests[i].dr2;
+        ctx.Dr3 = debug_register_tests[i].dr3;
+        ctx.Dr6 = debug_register_tests[i].dr6;
+        ctx.Dr7 = debug_register_tests[i].dr7;
 
         status = pNtSetContextThread(GetCurrentThread(), &ctx);
         ok(status == STATUS_SUCCESS, "NtGetContextThread failed with %08x\n", status);
@@ -2407,15 +2409,15 @@ static void test_debug_registers(void)
 
         status = pNtGetContextThread(GetCurrentThread(), &ctx);
         ok(status == STATUS_SUCCESS, "NtGetContextThread failed with %08x\n", status);
-        ok(ctx.Dr0 == tests[i].dr0, "test %d: expected %lx, got %lx\n", i, tests[i].dr0, (DWORD_PTR)ctx.Dr0);
-        ok(ctx.Dr1 == tests[i].dr1, "test %d: expected %lx, got %lx\n", i, tests[i].dr1, (DWORD_PTR)ctx.Dr1);
-        ok(ctx.Dr2 == tests[i].dr2, "test %d: expected %lx, got %lx\n", i, tests[i].dr2, (DWORD_PTR)ctx.Dr2);
-        ok(ctx.Dr3 == tests[i].dr3, "test %d: expected %lx, got %lx\n", i, tests[i].dr3, (DWORD_PTR)ctx.Dr3);
-        ok((ctx.Dr6 &  0xf00f) == tests[i].dr6, "test %d: expected %lx, got %lx\n", i, tests[i].dr6, (DWORD_PTR)ctx.Dr6);
-        ok((ctx.Dr7 & ~0xdc00) == tests[i].dr7, "test %d: expected %lx, got %lx\n", i, tests[i].dr7, (DWORD_PTR)ctx.Dr7);
+        ok(ctx.Dr0 == debug_register_tests[i].dr0, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr0, (DWORD_PTR)ctx.Dr0);
+        ok(ctx.Dr1 == debug_register_tests[i].dr1, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr1, (DWORD_PTR)ctx.Dr1);
+        ok(ctx.Dr2 == debug_register_tests[i].dr2, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr2, (DWORD_PTR)ctx.Dr2);
+        ok(ctx.Dr3 == debug_register_tests[i].dr3, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr3, (DWORD_PTR)ctx.Dr3);
+        ok((ctx.Dr6 &  0xf00f) == debug_register_tests[i].dr6, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr6, (DWORD_PTR)ctx.Dr6);
+        ok((ctx.Dr7 & ~0xdc00) == debug_register_tests[i].dr7, "test %d: expected %lx, got %lx\n", i, debug_register_tests[i].dr7, (DWORD_PTR)ctx.Dr7);
 
 #if defined(__x86_64__)
-        run_exception_test(dr7_handler, &tests[i].dr7, dr7_test_code, sizeof(dr7_test_code), 0);
+        run_exception_test(debug_register_handler, &i, debug_register_test_code, sizeof(debug_register_test_code), 0);
 #endif
     }
 }
