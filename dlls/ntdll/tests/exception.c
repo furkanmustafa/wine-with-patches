@@ -161,6 +161,7 @@ static EXCEPTION_DISPOSITION (WINAPI *p__C_specific_handler)(EXCEPTION_RECORD*, 
 static VOID      (WINAPI *pRtlCaptureContext)(CONTEXT*);
 static VOID      (CDECL *pRtlRestoreContext)(CONTEXT*, EXCEPTION_RECORD*);
 static VOID      (CDECL *pRtlUnwindEx)(VOID*, VOID*, EXCEPTION_RECORD*, VOID*, CONTEXT*, UNWIND_HISTORY_TABLE*);
+static PIMAGE_NT_HEADERS (WINAPI *pRtlImageNtHeader)(PVOID);
 static int       (CDECL *p_setjmp)(_JUMP_BUFFER*);
 #endif
 
@@ -2593,6 +2594,40 @@ static void test_exceptions(void)
     run_exception_test(int3_handler, NULL, int3_code, sizeof(int3_code), 0);
 }
 
+static DWORD WINAPI read_fault_handler( EXCEPTION_RECORD *rec, ULONG64 frame,
+                                        CONTEXT *context, DISPATCHER_CONTEXT *dispatcher )
+{
+    got_exception++;
+    context->Rip += 2; /* skip faulting read */
+    trace( "fault reading %lx\n", rec->ExceptionInformation[1] );
+    return ExceptionContinueExecution;
+}
+
+static const BYTE read_dword_code[] = {
+    0x48, 0x8b, 0x0d, 0x03, 0x00, 0x00, 0x00, /* mov 3(%rip), %rcx */
+    0x8b, 0x01,                               /* mov (%rcx), %eax */
+    0xc3,                                     /* ret */
+};
+
+static void test_mem_holes(void)
+{
+    BYTE code[sizeof(read_dword_code) + sizeof(char *)];
+    char *mem;
+    void *ntdll = GetModuleHandleA( "ntdll.dll" );
+    PIMAGE_NT_HEADERS nt = RtlImageNtHeader( ntdll );
+    DWORD size = nt->OptionalHeader.SizeOfImage;
+
+    memcpy(code, read_dword_code, sizeof(read_dword_code));
+
+    got_exception = 0;
+    for (mem = ntdll; mem < (char*)ntdll + size; mem += 0x1000)
+    {
+        *(char **)&code[sizeof(read_dword_code)] = mem;
+        run_exception_test(read_fault_handler, NULL, code, sizeof(code), 0);
+    }
+    ok( got_exception == 0, "expected 0 exceptions, got %d\n", got_exception);
+}
+
 #endif  /* __x86_64__ */
 
 #if defined(__i386__) || defined(__x86_64__)
@@ -3161,6 +3196,8 @@ START_TEST(exception)
                                                                  "RtlRestoreContext" );
     pRtlUnwindEx                       = (void *)GetProcAddress( hntdll,
                                                                  "RtlUnwindEx" );
+    pRtlImageNtHeader                  = (void *)GetProcAddress( hntdll,
+                                                                 "RtlImageNtHeader" );
     p_setjmp                           = (void *)GetProcAddress( hmsvcrt,
                                                                  "_setjmp" );
     test_debug_registers();
@@ -3175,6 +3212,7 @@ START_TEST(exception)
     test_prot_fault();
     test_unwind_rdi_rsi();
     test_exceptions();
+    test_mem_holes();
 
     if (pRtlAddFunctionTable && pRtlDeleteFunctionTable && pRtlInstallFunctionTableCallback && pRtlLookupFunctionEntry)
       test_dynamic_unwind();
