@@ -490,6 +490,8 @@ static void DSOUND_MixToTemporary(IDirectSoundBufferImpl *dsb, DWORD frames)
 			dsb->device->tmp_buffer = HeapAlloc(GetProcessHeap(), 0, size_bytes);
         dsb->device->tmp_buffer_len = size_bytes;
 	}
+	if(dsb->put_aux == putieee32_sum)
+		memset(dsb->device->tmp_buffer, 0, dsb->device->tmp_buffer_len);
 
     if(dsb->put_aux == putieee32_sum)
         memset(dsb->device->tmp_buffer, 0, dsb->device->tmp_buffer_len);
