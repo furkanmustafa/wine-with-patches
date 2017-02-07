@@ -104,6 +104,12 @@ struct builtin_load_info
 static struct builtin_load_info default_load_info;
 static struct builtin_load_info *builtin_load_info = &default_load_info;
 
+struct start_params
+{
+    void                   *kernel_start;
+    LPTHREAD_START_ROUTINE  entry;
+};
+
 static HANDLE main_exe_file;
 static UINT tls_module_count;      /* number of modules with TLS directory */
 static IMAGE_TLS_DIRECTORY *tls_dirs;  /* array of TLS directories */
@@ -3412,22 +3418,12 @@ static void load_global_options(void)
 /***********************************************************************
  *           start_process
  */
-static void start_process( void *kernel_start )
+static void start_process( void *arg )
 {
-    IMAGE_NT_HEADERS *nt;
-    LPTHREAD_START_ROUTINE entry;
-    PEB *peb = NtCurrentTeb()->Peb;
 
-    nt = RtlImageNtHeader( peb->ImageBaseAddress );
-    entry = (LPTHREAD_START_ROUTINE)((char *)peb->ImageBaseAddress +
-                                     nt->OptionalHeader.AddressOfEntryPoint);
-
-#ifdef __x86_64__
-    if (is_cli_only_image( peb->ImageBaseAddress ))
-        entry = (LPTHREAD_START_ROUTINE)p_CorExeMain;
-#endif
-
-    call_thread_entry_point( kernel_start, entry );
+    // call_thread_entry_point( kernel_start, NtCurrentTeb()->Peb );
+    struct start_params *start_params = (struct start_params *)arg;
+    call_thread_entry_point( start_params->kernel_start, start_params->entry );
 }
 
 /******************************************************************
@@ -3443,8 +3439,25 @@ void WINAPI LdrInitializeThunk( void *kernel_start, ULONG_PTR unknown2,
     WINE_MODREF *wm;
     LPCWSTR load_path;
     PEB *peb = NtCurrentTeb()->Peb;
+    IMAGE_NT_HEADERS *nt;
+    struct start_params start_params;
 
     if (main_exe_file) NtClose( main_exe_file );  /* at this point the main module is created */
+
+    nt = RtlImageNtHeader( peb->ImageBaseAddress );
+    if (nt->OptionalHeader.AddressOfEntryPoint) {
+        start_params.entry = (LPTHREAD_START_ROUTINE)((char *)peb->ImageBaseAddress +
+                                                      nt->OptionalHeader.AddressOfEntryPoint);
+    }
+    else {
+        start_params.entry = NULL;
+    }
+    start_params.kernel_start = kernel_start;
+
+#ifdef __x86_64__
+    if (is_cli_only_image( peb->ImageBaseAddress ))
+        start_params.entry = (LPTHREAD_START_ROUTINE)p_CorExeMain;
+#endif
 
     /* allocate the modref for the main exe (if not already done) */
     wm = get_modref( peb->ImageBaseAddress );
@@ -3489,7 +3502,7 @@ void WINAPI LdrInitializeThunk( void *kernel_start, ULONG_PTR unknown2,
     timeout.QuadPart = 0;
     NtDelayExecution( TRUE, &timeout );
 
-    wine_switch_to_stack( start_process, kernel_start, NtCurrentTeb()->Tib.StackBase );
+    wine_switch_to_stack( start_process, &start_params, NtCurrentTeb()->Tib.StackBase );
 
 error:
     ERR( "Main exe initialization for %s failed, status %x\n",
