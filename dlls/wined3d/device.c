@@ -5219,7 +5219,6 @@ err:
     return hr;
 }
 
-
 void device_invalidate_state(const struct wined3d_device *device, DWORD state)
 {
     DWORD rep = device->StateTable[state].representative;
@@ -5227,6 +5226,13 @@ void device_invalidate_state(const struct wined3d_device *device, DWORD state)
     DWORD idx;
     BYTE shift;
     UINT i;
+
+    if (STATE_IS_COMPUTE(state))
+    {
+        for (i = 0; i < device->context_count; ++i)
+            context_invalidate_compute_state(device->contexts[i], state);
+        return;
+    }
 
     for (i = 0; i < device->context_count; ++i)
     {

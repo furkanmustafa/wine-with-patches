@@ -1411,6 +1411,16 @@ static void context_enter(struct wined3d_context *context)
     }
 }
 
+void context_invalidate_compute_state(struct wined3d_context *context, DWORD state_id)
+{
+    DWORD representative = context->state_table[state_id].representative - STATE_COMPUTE_OFFSET;
+    unsigned int index, shift;
+
+    index = representative / (sizeof(*context->dirty_compute_states) * CHAR_BIT);
+    shift = representative & (sizeof(*context->dirty_compute_states) * CHAR_BIT - 1);
+    context->dirty_compute_states[index] |= (1u << shift);
+}
+
 void context_invalidate_state(struct wined3d_context *context, DWORD state)
 {
     DWORD rep = context->state_table[state].representative;
@@ -3330,7 +3340,8 @@ static void context_preload_textures(struct wined3d_context *context, const stru
     }
 }
 
-static void context_load_shader_resources(struct wined3d_context *context, const struct wined3d_state *state)
+static void context_load_shader_resources(struct wined3d_context *context, const struct wined3d_state *state,
+        unsigned int shader_mask)
 {
     struct wined3d_shader_sampler_map_entry *entry;
     struct wined3d_shader_resource_view *view;
@@ -3339,6 +3350,9 @@ static void context_load_shader_resources(struct wined3d_context *context, const
 
     for (i = 0; i < WINED3D_SHADER_TYPE_COUNT; ++i)
     {
+        if (!(shader_mask & (1u << i)))
+            continue;
+
         if (!(shader = state->shader[i]))
             continue;
 
@@ -3507,7 +3521,7 @@ BOOL context_apply_draw_state(struct wined3d_context *context,
      * updating a resource location. */
     context_update_tex_unit_map(context, state);
     context_preload_textures(context, state);
-    context_load_shader_resources(context, state);
+    context_load_shader_resources(context, state, ~(1u << WINED3D_SHADER_TYPE_COMPUTE));
     /* TODO: Right now the dependency on the vertex shader is necessary
      * since context_stream_info_from_declaration depends on the reg_maps of
      * the current VS but maybe it's possible to relax the coupling in some
@@ -3546,10 +3560,10 @@ BOOL context_apply_draw_state(struct wined3d_context *context,
         state_table[rep].apply(context, state, rep);
     }
 
-    if (context->shader_update_mask)
+    if (context->shader_update_mask & ~(1u << WINED3D_SHADER_TYPE_COMPUTE))
     {
         device->shader_backend->shader_select(device->shader_priv, context, state);
-        context->shader_update_mask = 0;
+        context->shader_update_mask &= 1u << WINED3D_SHADER_TYPE_COMPUTE;
     }
 
     if (context->constant_update_mask)
@@ -3584,7 +3598,28 @@ BOOL context_apply_draw_state(struct wined3d_context *context,
 void context_apply_compute_state(struct wined3d_context *context,
         const struct wined3d_device *device, const struct wined3d_state *state)
 {
-    FIXME("Implement applying compute state.\n");
+    const struct StateEntry *state_table = context->state_table;
+    unsigned int state_id, i, j;
+
+    context_load_shader_resources(context, state, 1u << WINED3D_SHADER_TYPE_COMPUTE);
+
+    for (i = 0, state_id = STATE_COMPUTE_OFFSET; i < ARRAY_SIZE(context->dirty_compute_states); ++i)
+    {
+        for (j = 0; j < sizeof(*context->dirty_compute_states) * CHAR_BIT; ++j, ++state_id)
+        {
+            if (context->dirty_compute_states[i] & (1u << j))
+                state_table[state_id].apply(context, state, state_id);
+        }
+    }
+    memset(context->dirty_compute_states, 0, sizeof(*context->dirty_compute_states));
+
+    if (context->shader_update_mask & (1u << WINED3D_SHADER_TYPE_COMPUTE))
+    {
+        device->shader_backend->shader_select_compute(device->shader_priv, context, state);
+        context->shader_update_mask &= ~(1u << WINED3D_SHADER_TYPE_COMPUTE);
+    }
+
+    context->last_was_blit = FALSE;
 }
 
 static void context_setup_target(struct wined3d_context *context,
