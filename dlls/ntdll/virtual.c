@@ -1461,6 +1461,9 @@ NTSTATUS virtual_create_builtin_view( void *module )
     void *base;
     int i;
 
+    TRACE("BaseOfCode %u, SizeOfCode %u, SizeOfInitializedData %u, SizeOfImage %u\n",
+            nt->OptionalHeader.BaseOfCode, nt->OptionalHeader.SizeOfCode, nt->OptionalHeader.SizeOfInitializedData, nt->OptionalHeader.SizeOfImage);
+
     size = ROUND_SIZE( module, size );
     base = ROUND_ADDR( module, page_mask );
     server_enter_uninterrupted_section( &csVirtual, &sigset );
@@ -1484,6 +1487,44 @@ NTSTATUS virtual_create_builtin_view( void *module )
         if (sec[i].Characteristics & IMAGE_SCN_MEM_WRITE) flags |= VPROT_WRITE;
         memset (view->prot + (sec[i].VirtualAddress >> page_shift), flags,
                 ROUND_SIZE( sec[i].VirtualAddress, sec[i].Misc.VirtualSize ) >> page_shift );
+    }
+
+    /* Dump current host mappings for the builtin module. */
+    {
+        FILE *maps_file = fopen("/proc/self/maps", "rt");
+        char line[256], prot[16];
+        UINT_PTR start, end;
+
+        while (fgets(line, sizeof(line), maps_file))
+        {
+            sscanf(line, "%lx-%lx %s", &start, &end, prot);
+            if (start >= (UINT_PTR)base && start < (UINT_PTR)base + size)
+            {
+                TRACE("start %lx, end %lx, prot %s\n", start, end, prot);
+                if (prot[0] == '-')
+                {
+                    /* ERR("Force enabling read permission for %lx-%lx\n", start, end); */
+                    /* if (mprotect((void *)start, end - start, PROT_READ)) */
+                    /*     ERR("mprotect failed!\n"); */
+                    ERR("Destroying old and creating new anonymous mapping for %lx-%lx\n", start, end);
+                    if (munmap((void *)start, end - start))
+                        ERR("munmap failed!\n");
+                    if ((UINT_PTR)mmap((void *)start, end - start, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS| MAP_FIXED, 0, 0) != start)
+                        ERR("mmap failed!\n");
+                }
+            }
+        }
+        fclose(maps_file);
+
+        /* Doublecheck the mappings... */
+        maps_file = fopen("/proc/self/maps", "rt");
+        while (fgets(line, sizeof(line), maps_file))
+        {
+            sscanf(line, "%lx-%lx %s", &start, &end, prot);
+            if (start >= (UINT_PTR)base && start < (UINT_PTR)base + size)
+                ERR("start %lx, end %lx, prot %s\n", start, end, prot);
+        }
+        fclose(maps_file);
     }
 
     return status;
