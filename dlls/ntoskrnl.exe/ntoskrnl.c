@@ -713,15 +713,6 @@ void WINAPI IoStartTimer( DEVICE_OBJECT *dev )
 /***********************************************************************
  *           IoStopTimer   (NTOSKRNL.EXE.@)
  */
-void WINAPI IoStopTimer( DEVICE_OBJECT *dev )
-{
-    FIXME( "stub: %p\n", dev );
-}
-
-
-/***********************************************************************
- *           IoStopTimer   (NTOSKRNL.EXE.@)
- */
 void WINAPI IoStopTimer(PDEVICE_OBJECT DeviceObject)
 {
     FIXME( "stub: %p\n", DeviceObject );
