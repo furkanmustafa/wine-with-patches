@@ -231,4 +231,14 @@ void release_desktop_folder(void) DECLSPEC_HIDDEN;
 void SHELL_GetInternalImageLists(HIMAGELIST *lpSmallList, HIMAGELIST *lpLargeList,
     HIMAGELIST *lpExtraLargeList, HIMAGELIST *lpJumboList) DECLSPEC_HIDDEN;
 
+static inline WCHAR *strdupW(const WCHAR *src)
+{
+    WCHAR *dest;
+    if (!src) return NULL;
+    dest = HeapAlloc(GetProcessHeap(), 0, (lstrlenW(src) + 1) * sizeof(*dest));
+    if (dest)
+        lstrcpyW(dest, src);
+    return dest;
+}
+
 #endif

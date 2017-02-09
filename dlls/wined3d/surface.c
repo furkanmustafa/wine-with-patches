@@ -1674,7 +1674,8 @@ static struct wined3d_texture *surface_convert_format(struct wined3d_texture *sr
 
     if (!(conv = find_converter(src_format->id, dst_format->id)) && (!device->d3d_initialized
             || !is_identity_fixup(src_format->color_fixup) || src_format->convert
-            || !is_identity_fixup(dst_format->color_fixup) || dst_format->convert))
+            || !is_identity_fixup(dst_format->color_fixup) || dst_format->convert
+            || (src_format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_COMPRESSED)))
     {
         FIXME("Cannot find a conversion function from format %s to %s.\n",
                 debug_d3dformat(src_format->id), debug_d3dformat(dst_format->id));
@@ -3083,7 +3084,11 @@ static BOOL ffp_blit_supported(const struct wined3d_gl_info *gl_info,
         const RECT *src_rect, DWORD src_usage, enum wined3d_pool src_pool, const struct wined3d_format *src_format,
         const RECT *dst_rect, DWORD dst_usage, enum wined3d_pool dst_pool, const struct wined3d_format *dst_format)
 {
-    if (src_pool == WINED3D_POOL_SYSTEM_MEM || dst_pool == WINED3D_POOL_SYSTEM_MEM)
+    BOOL decompress;
+
+    decompress = src_format && (src_format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_COMPRESSED)
+            && !(dst_format->flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_COMPRESSED);
+    if (!decompress && (src_pool == WINED3D_POOL_SYSTEM_MEM || dst_pool == WINED3D_POOL_SYSTEM_MEM))
     {
         TRACE("Source or destination is in system memory.\n");
         return FALSE;

@@ -5684,7 +5684,7 @@ static HRESULT WINAPI ITypeInfo_fnQueryInterface(
     if(IsEqualIID(riid, &IID_IUnknown) ||
             IsEqualIID(riid,&IID_ITypeInfo)||
             IsEqualIID(riid,&IID_ITypeInfo2))
-        *ppvObject = This;
+        *ppvObject = &This->ITypeInfo2_iface;
     else if(IsEqualIID(riid, &IID_ICreateTypeInfo) ||
              IsEqualIID(riid, &IID_ICreateTypeInfo2))
         *ppvObject = &This->ICreateTypeInfo2_iface;

@@ -1228,6 +1228,14 @@ NTSTATUS WINAPI NtQueryInformationThread( HANDLE handle, THREADINFOCLASS class,
             }
         }
         return status;
+    case ThreadIsIoPending:
+        FIXME( "ThreadIsIoPending info class not supported yet\n" );
+        if (length != sizeof(BOOL)) return STATUS_INFO_LENGTH_MISMATCH;
+        if (!data) return STATUS_ACCESS_DENIED;
+
+        *(BOOL*)data = FALSE;
+        if (ret_len) *ret_len = sizeof(BOOL);
+        return STATUS_SUCCESS;
     case ThreadPriority:
     case ThreadBasePriority:
     case ThreadImpersonationToken:
@@ -1238,7 +1246,6 @@ NTSTATUS WINAPI NtQueryInformationThread( HANDLE handle, THREADINFOCLASS class,
     case ThreadIdealProcessor:
     case ThreadPriorityBoost:
     case ThreadSetTlsArrayAddress:
-    case ThreadIsIoPending:
     default:
         FIXME( "info class %d not supported yet\n", class );
         return STATUS_NOT_IMPLEMENTED;

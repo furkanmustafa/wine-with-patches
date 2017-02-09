@@ -1463,6 +1463,7 @@ enable_vcomp90
 enable_vcruntime140
 enable_vdmdbg
 enable_version
+enable_virtdisk
 enable_vssapi
 enable_vulkan_1
 enable_vulkan
@@ -18473,7 +18474,7 @@ wine_fn_config_dll comm.drv16 enable_win16
 wine_fn_config_dll commdlg.dll16 enable_win16
 wine_fn_config_dll compobj.dll16 enable_win16
 wine_fn_config_dll compstui enable_compstui implib
-wine_fn_config_dll comsvcs enable_comsvcs implib
+wine_fn_config_dll comsvcs enable_comsvcs clean,implib
 wine_fn_config_dll concrt140 enable_concrt140
 wine_fn_config_dll connect enable_connect
 wine_fn_config_dll credui enable_credui clean,implib
@@ -19062,6 +19063,7 @@ wine_fn_config_dll vdmdbg enable_vdmdbg implib
 wine_fn_config_dll ver.dll16 enable_win16
 wine_fn_config_dll version enable_version implib
 wine_fn_config_test dlls/version/tests version_test
+wine_fn_config_dll virtdisk enable_virtdisk
 wine_fn_config_dll vmm.vxd enable_win16
 wine_fn_config_dll vnbt.vxd enable_win16
 wine_fn_config_dll vnetbios.vxd enable_win16
