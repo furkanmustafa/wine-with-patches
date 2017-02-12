@@ -1382,6 +1382,7 @@ static const struct gpu_description gpu_description_table[] =
     {HW_VENDOR_AMD,        CARD_AMD_RADEON_HD8600M,        "AMD Radeon HD 8600M Series",       DRIVER_AMD_R600,         1024},
     {HW_VENDOR_AMD,        CARD_AMD_RADEON_HD8670,         "AMD Radeon HD 8670",               DRIVER_AMD_R600,         2048},
     {HW_VENDOR_AMD,        CARD_AMD_RADEON_HD8770,         "AMD Radeon HD 8770",               DRIVER_AMD_R600,         2048},
+    {HW_VENDOR_AMD,        CARD_AMD_RADEON_HD8870M,        "AMD Radeon HD 8870M",              DRIVER_AMD_R600,         2048},
     {HW_VENDOR_AMD,        CARD_AMD_RADEON_R3,             "AMD Radeon HD 8400 / R3 Series",   DRIVER_AMD_R600,         2048},
     {HW_VENDOR_AMD,        CARD_AMD_RADEON_R7,             "AMD Radeon(TM) R7 Graphics",       DRIVER_AMD_R600,         2048},
     {HW_VENDOR_AMD,        CARD_AMD_RADEON_R9_285,         "AMD Radeon R9 285",                DRIVER_AMD_RX,           2048},
@@ -2173,7 +2174,7 @@ cards_amd_mesa[] =
     {"HAINAN",                      CARD_AMD_RADEON_HD8600M},
     {"TAHITI",                      CARD_AMD_RADEON_HD7900},
     {"PITCAIRN",                    CARD_AMD_RADEON_HD7800},
-    {"CAPE VERDE",                  CARD_AMD_RADEON_HD7700},
+    {"CAPE VERDE",                  CARD_AMD_RADEON_HD8870M},
     /* Northern Islands */
     {"ARUBA",                       CARD_AMD_RADEON_HD7660D},
     {"CAYMAN",                      CARD_AMD_RADEON_HD6900},
