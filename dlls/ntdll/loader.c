@@ -3478,8 +3478,18 @@ void WINAPI LdrInitializeThunk( void *kernel_start, ULONG_PTR unknown2,
     WINE_MODREF *wm;
     LPCWSTR load_path;
     PEB *peb = NtCurrentTeb()->Peb;
+    IMAGE_NT_HEADERS *nt;
+    struct start_params start_params;
 
     if (main_exe_file) NtClose( main_exe_file );  /* at this point the main module is created */
+
+    nt = RtlImageNtHeader( peb->ImageBaseAddress );
+    if (nt->OptionalHeader.AddressOfEntryPoint)
+        start_params.entry = (LPTHREAD_START_ROUTINE)((char *)peb->ImageBaseAddress +
+                                                      nt->OptionalHeader.AddressOfEntryPoint);
+    else
+        start_params.entry = NULL;
+    start_params.kernel_start = kernel_start;
 
     /* allocate the modref for the main exe (if not already done) */
     wm = get_modref( peb->ImageBaseAddress );
