@@ -3532,7 +3532,7 @@ void state_shademode(struct wined3d_context *context,
         const struct wined3d_state *state, DWORD state_id) DECLSPEC_HIDDEN;
 static inline BOOL state_is_dual_source_blend(const struct wined3d_state *state)
 {
-#define IS_DUAL_SOURCE_BLEND(x) ((x) >= WINED3D_BLEND_SRC1_COLOR && (x) <= WINED3D_BLEND_INV_SRC1_ALPHA)
+#define IS_DUAL_SOURCE_BLEND(x) ((x) >= WINED3D_BLEND_SRC1COLOR && (x) <= WINED3D_BLEND_INVSRC1ALPHA)
     if (state->render_states[WINED3D_RS_ALPHABLENDENABLE] &&
             (IS_DUAL_SOURCE_BLEND(state->render_states[WINED3D_RS_SRCBLENDALPHA]) ||
              IS_DUAL_SOURCE_BLEND(state->render_states[WINED3D_RS_DESTBLENDALPHA])))

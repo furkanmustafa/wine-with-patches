@@ -4242,7 +4242,7 @@ HRESULT CDECL wined3d_device_clear_rendertarget_view(struct wined3d_device *devi
 
         ERR("Clearing 3D target, flags=%x\n", flags);
 
-        context = context_acquire(device, NULL);
+        context = context_acquire(device, NULL, 0);
         gl_info = context->gl_info;
 
         wined3d_texture_prepare_texture(texture, context, FALSE);
