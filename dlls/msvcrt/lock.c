@@ -265,13 +265,7 @@ MSVCRT_bool __thiscall SpinWait__SpinOnce(SpinWait *this)
         SpinWait__Reset(this);
         /* fall through */
     case SPINWAIT_SPIN:
-#ifdef __i386__
-        __asm__ __volatile__( "rep;nop" : : : "memory" );
-#else
-        __asm__ __volatile__( "" : : : "memory" );
-#endif
-
-        this->spin--;
+        InterlockedDecrement((LONG*)&this->spin);
         if(!this->spin)
             this->state = this->unknown ? SPINWAIT_YIELD : SPINWAIT_DONE;
         return TRUE;
@@ -961,6 +955,81 @@ void __thiscall reader_writer_lock_unlock(reader_writer_lock *this)
     if (InterlockedCompareExchangePointer((void**)&this->writer_tail, NULL, this->writer_head) == this->writer_head)
         return;
     InterlockedOr(&this->count, WRITER_WAITING);
+}
+
+typedef struct {
+    CRITICAL_SECTION cs;
+} _ReentrantBlockingLock;
+
+/* ??0_ReentrantBlockingLock@details@Concurrency@@QAE@XZ */
+/* ??0_ReentrantBlockingLock@details@Concurrency@@QEAA@XZ */
+DEFINE_THISCALL_WRAPPER(_ReentrantBlockingLock_ctor, 4)
+_ReentrantBlockingLock* __thiscall _ReentrantBlockingLock_ctor(_ReentrantBlockingLock *this)
+{
+    TRACE("(%p)\n", this);
+
+    InitializeCriticalSection(&this->cs);
+    this->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": _ReentrantBlockingLock");
+    return this;
+}
+
+/* ??1_ReentrantBlockingLock@details@Concurrency@@QAE@XZ */
+/* ??1_ReentrantBlockingLock@details@Concurrency@@QEAA@XZ */
+DEFINE_THISCALL_WRAPPER(_ReentrantBlockingLock_dtor, 4)
+void __thiscall _ReentrantBlockingLock_dtor(_ReentrantBlockingLock *this)
+{
+    TRACE("(%p)\n", this);
+
+    this->cs.DebugInfo->Spare[0] = 0;
+    DeleteCriticalSection(&this->cs);
+}
+
+/* ?_Acquire@_ReentrantBlockingLock@details@Concurrency@@QAEXXZ */
+/* ?_Acquire@_ReentrantBlockingLock@details@Concurrency@@QEAAXXZ */
+DEFINE_THISCALL_WRAPPER(_ReentrantBlockingLock__Acquire, 4)
+void __thiscall _ReentrantBlockingLock__Acquire(_ReentrantBlockingLock *this)
+{
+    TRACE("(%p)\n", this);
+    EnterCriticalSection(&this->cs);
+}
+
+/* ?_Release@_ReentrantBlockingLock@details@Concurrency@@QAEXXZ */
+/* ?_Release@_ReentrantBlockingLock@details@Concurrency@@QEAAXXZ */
+DEFINE_THISCALL_WRAPPER(_ReentrantBlockingLock__Release, 4)
+void __thiscall _ReentrantBlockingLock__Release(_ReentrantBlockingLock *this)
+{
+    TRACE("(%p)\n", this);
+    LeaveCriticalSection(&this->cs);
+}
+
+/* ?_TryAcquire@_ReentrantBlockingLock@details@Concurrency@@QAE_NXZ */
+/* ?_TryAcquire@_ReentrantBlockingLock@details@Concurrency@@QEAA_NXZ */
+DEFINE_THISCALL_WRAPPER(_ReentrantBlockingLock__TryAcquire, 4)
+MSVCRT_bool __thiscall _ReentrantBlockingLock__TryAcquire(_ReentrantBlockingLock *this)
+{
+    TRACE("(%p)\n", this);
+    return TryEnterCriticalSection(&this->cs);
+}
+#endif
+
+#if _MSVCR_VER == 110
+static LONG shared_ptr_lock;
+
+void __cdecl _Lock_shared_ptr_spin_lock(void)
+{
+    LONG l = 0;
+
+    while(InterlockedCompareExchange(&shared_ptr_lock, 1, 0) != 0) {
+        if(l++ == 1000) {
+            Sleep(0);
+            l = 0;
+        }
+    }
+}
+
+void __cdecl _Unlock_shared_ptr_spin_lock(void)
+{
+    shared_ptr_lock = 0;
 }
 #endif
 

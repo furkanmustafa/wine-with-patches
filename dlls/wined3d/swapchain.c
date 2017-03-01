@@ -27,6 +27,11 @@
 WINE_DEFAULT_DEBUG_CHANNEL(d3d);
 WINE_DECLARE_DEBUG_CHANNEL(fps);
 
+static void wined3d_swapchain_destroy_object(void *object)
+{
+    swapchain_destroy_contexts(object);
+}
+
 static void swapchain_cleanup(struct wined3d_swapchain *swapchain)
 {
     HRESULT hr;
@@ -60,11 +65,7 @@ static void swapchain_cleanup(struct wined3d_swapchain *swapchain)
         swapchain->back_buffers = NULL;
     }
 
-    for (i = 0; i < swapchain->num_contexts; ++i)
-    {
-        context_destroy(swapchain->device, swapchain->context[i]);
-    }
-    HeapFree(GetProcessHeap(), 0, swapchain->context);
+    wined3d_cs_destroy_object(swapchain->device->cs, wined3d_swapchain_destroy_object, swapchain);
 
     /* Restore the screen resolution if we rendered in fullscreen.
      * This will restore the screen resolution to what it was before creating
@@ -491,7 +492,7 @@ static void swapchain_gl_present(struct wined3d_swapchain *swapchain,
         const RECT *src_rect, const RECT *dst_rect, DWORD flags)
 {
     struct wined3d_texture *back_buffer = swapchain->back_buffers[0];
-    const struct wined3d_fb_state *fb = &swapchain->device->fb;
+    const struct wined3d_fb_state *fb = &swapchain->device->cs->fb;
     const struct wined3d_gl_info *gl_info;
     struct wined3d_texture *logo_texture;
     struct wined3d_context *context;
@@ -929,7 +930,6 @@ static HRESULT swapchain_init(struct wined3d_swapchain *swapchain, struct wined3
             hr = E_OUTOFMEMORY;
             goto err;
         }
-        swapchain->num_contexts = 1;
 
         /* In WGL both color, depth and stencil are features of a pixel format. In case of D3D they are separate.
          * You are able to add a depth + stencil surface at a later stage when you need it.
@@ -957,6 +957,7 @@ static HRESULT swapchain_init(struct wined3d_swapchain *swapchain, struct wined3
             hr = WINED3DERR_NOTAVAILABLE;
             goto err;
         }
+        swapchain->num_contexts = 1;
 
         if (wined3d_settings.offscreen_rendering_mode != ORM_FBO
                 && (!desc->enable_auto_depth_stencil
@@ -1055,16 +1056,7 @@ err:
         HeapFree(GetProcessHeap(), 0, swapchain->back_buffers);
     }
 
-    if (swapchain->context)
-    {
-        if (swapchain->context[0])
-        {
-            context_release(swapchain->context[0]);
-            context_destroy(device, swapchain->context[0]);
-            swapchain->num_contexts = 0;
-        }
-        HeapFree(GetProcessHeap(), 0, swapchain->context);
-    }
+    wined3d_cs_destroy_object(swapchain->device->cs, wined3d_swapchain_destroy_object, swapchain);
 
     if (swapchain->front_buffer)
     {

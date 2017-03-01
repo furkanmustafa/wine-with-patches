@@ -639,6 +639,7 @@ static const int ws_flags_map[][2] =
     MAP_OPTION( MSG_PEEK ),
     MAP_OPTION( MSG_DONTROUTE ),
     MAP_OPTION( MSG_WAITALL ),
+    { WS_MSG_PARTIAL, 0 },
 };
 
 static const int ws_sock_map[][2] =
@@ -1772,13 +1773,16 @@ static inline BOOL supported_protocol(int protocol)
 
 /**********************************************************************/
 
-/* Returns the length of the converted address if successful, 0 if it was too small to
- * start with.
+/* Returns the length of the converted address if successful, 0 if it was too
+ * small to start with or unknown family or invalid address buffer.
  */
 static unsigned int ws_sockaddr_ws2u(const struct WS_sockaddr* wsaddr, int wsaddrlen,
                                      union generic_unix_sockaddr *uaddr)
 {
     unsigned int uaddrlen = 0;
+
+    if (!wsaddr)
+        return 0;
 
     switch (wsaddr->sa_family)
     {
@@ -6612,7 +6616,7 @@ static int convert_aiflag_w2u(int winflags) {
             winflags &= ~ws_aiflag_map[i][0];
         }
     if (winflags)
-        FIXME("Unhandled windows AI_xxx flags %x\n", winflags);
+        FIXME("Unhandled windows AI_xxx flags 0x%x\n", winflags);
     return unixflags;
 }
 
@@ -6626,7 +6630,7 @@ static int convert_niflag_w2u(int winflags) {
             winflags &= ~ws_niflag_map[i][0];
         }
     if (winflags)
-        FIXME("Unhandled windows NI_xxx flags %x\n", winflags);
+        FIXME("Unhandled windows NI_xxx flags 0x%x\n", winflags);
     return unixflags;
 }
 
@@ -6639,8 +6643,8 @@ static int convert_aiflag_u2w(int unixflags) {
             winflags |= ws_aiflag_map[i][0];
             unixflags &= ~ws_aiflag_map[i][1];
         }
-    if (unixflags) /* will warn usually */
-        WARN("Unhandled UNIX AI_xxx flags %x\n", unixflags);
+    if (unixflags)
+        WARN("Unhandled UNIX AI_xxx flags 0x%x\n", unixflags);
     return winflags;
 }
 

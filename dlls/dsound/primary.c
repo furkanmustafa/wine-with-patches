@@ -238,7 +238,10 @@ static HRESULT DSOUND_PrimaryOpen(DirectSoundDevice *device, WAVEFORMATEX *wfx, 
         mixfloat = TRUE;
 
     /* reallocate emulated primary buffer */
-    if (forcewave) {
+    if (forcewave || !mixfloat) {
+        if (!forcewave)
+            new_buflen = frames * wfx->nChannels * sizeof(float);
+
         if (device->buffer)
             newbuf = HeapReAlloc(GetProcessHeap(), 0, device->buffer, new_buflen);
         else
@@ -249,19 +252,6 @@ static HRESULT DSOUND_PrimaryOpen(DirectSoundDevice *device, WAVEFORMATEX *wfx, 
             return DSERR_OUTOFMEMORY;
         }
         FillMemory(newbuf, new_buflen, (wfx->wBitsPerSample == 8) ? 128 : 0);
-    } else if (!mixfloat) {
-        DWORD alloc_len = frames * sizeof(float);
-
-        if (device->buffer)
-            newbuf = HeapReAlloc(GetProcessHeap(), 0, device->buffer, alloc_len);
-        else
-            newbuf = HeapAlloc(GetProcessHeap(), 0, alloc_len);
-
-        if (!newbuf) {
-            ERR("failed to allocate primary buffer\n");
-            return DSERR_OUTOFMEMORY;
-        }
-        FillMemory(newbuf, alloc_len, (wfx->wBitsPerSample == 8) ? 128 : 0);
     } else {
         HeapFree(GetProcessHeap(), 0, device->buffer);
         newbuf = NULL;
